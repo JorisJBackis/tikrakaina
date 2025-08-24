@@ -72,7 +72,7 @@ export function FeaturesSection() {
         {/* Features showcase */}
         <div className="text-center mb-20">
           <h2 className="text-3xl lg:text-4xl font-bold text-white mb-4">
-            Kodėl VilniusVertė?
+            Kodėl TikraKaina?
           </h2>
           <p className="text-slate-400 max-w-2xl mx-auto mb-16">
             Profesionalūs įrankiai, skirti išmintingiems NT investuotojams ir pirkėjams
@@ -172,7 +172,7 @@ export function FeaturesSection() {
             Pasiruošęs priimti išmintingus NT sprendimus?
           </h2>
           <p className="text-slate-300 mb-8 max-w-2xl mx-auto">
-            Prisijunkite prie tūkstančių lietuvių, kurie jau sutaupė šimtus eurų naudodami VilniusVertę
+            Prisijunkite prie tūkstančių lietuvių, kurie jau sutaupė šimtus eurų naudodami TikraKaina
           </p>
           
           <button className="bg-gradient-to-r from-orange-500 to-pink-500 text-white font-bold py-4 px-8 rounded-xl hover:from-orange-600 hover:to-pink-600 transform hover:scale-105 transition-all duration-300 shadow-xl">

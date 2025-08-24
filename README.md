@@ -1,4 +1,4 @@
-# VilniusVertė - AI-Powered Real Estate Valuation SaaS
+# TikraKaina - AI-Powered Real Estate Valuation SaaS
 
 🏡 **Modern SaaS platform for Lithuanian real estate rental price predictions**
 
@@ -60,7 +60,7 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8000
 
 ### 2. Frontend Setup  
 ```bash
-cd vilnius-verte
+cd tikrakaina
 npm install
 npm run dev
 ```

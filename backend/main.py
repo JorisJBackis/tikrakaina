@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 # Initialize FastAPI app
 app = FastAPI(
-    title="VilniusVertė API",
+    title="TikraKaina API",
     description="AI-powered real estate valuation for Lithuanian rental market",
     version="1.0.0"
 )
