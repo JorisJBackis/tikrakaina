@@ -6,7 +6,7 @@ Scrapes aruodas.lt listings and predicts rental prices using a trained model.
 
 import requests
 import random
-import re
+import re1
 import json
 from bs4 import BeautifulSoup
 import pandas as pd
