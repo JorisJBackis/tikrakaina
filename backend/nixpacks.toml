@@ -1,5 +1,0 @@
-[phases.setup]
-apt_packages = ["git-lfs"]
-
-[phases.build]
-commands = ["git lfs pull", "pip install -r requirements.txt"]
