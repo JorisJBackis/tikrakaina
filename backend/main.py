@@ -29,7 +29,12 @@ app = FastAPI(
 # Configure CORS for Next.js frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3001"],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "https://tikrakaina.vercel.app", # <--- Add this line
+        "https://www.yourcustomdomain.com" # <--- Add this line if you have a custom domain for frontend
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
