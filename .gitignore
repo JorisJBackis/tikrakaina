@@ -19,10 +19,8 @@ backend/venv/
 venv/
 
 # ML Models (large files)
-*.pkl
 *.joblib
 *.h5
-*.model
 
 # Node.js
 node_modules/
