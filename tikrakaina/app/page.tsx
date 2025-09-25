@@ -92,7 +92,8 @@ export default function NotionStyleVersion() {
     }, 1000)
 
     try {
-      const response = await fetch('http://localhost:8000/api/predict', {
+      const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL!;
+      const response = await fetch(`${API_BASE}/api/predict`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url })
