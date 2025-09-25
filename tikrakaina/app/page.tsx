@@ -103,12 +103,12 @@ export default function NotionStyleVersion() {
         const data = await response.json()
         setResult(data)
         setLoading(false)
-      }, 30000)
+      }, 300)
     } catch (error) {
       setTimeout(() => {
         setLoading(false)
         alert('Analizė nepavyko. Bandykite dar kartą.')
-      }, 30000)
+      }, 300)
     }
   }
 
