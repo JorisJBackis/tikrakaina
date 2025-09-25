@@ -25,7 +25,7 @@ export default function RootLayout({
   return (
     <html lang="lt">
       <head> 
-        <meta name="verify-paysera" content="342abafec2abf1abc8d7faa5d63a400a">
+        <meta name="verify-paysera" content="342abafec2abf1abc8d7faa5d63a400a"/>
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
