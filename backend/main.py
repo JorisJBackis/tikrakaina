@@ -35,7 +35,8 @@ app.add_middleware(
         "https://vilrent.lt",
         "https://www.vilrent.lt",
         "https://vilrent.com",
-        "https://www.vilrent.com"
+        "https://www.vilrent.com",
+        "https://tikrakaina-production.up.railway.app",
     ],
     allow_credentials=True,
     allow_methods=["*"],
