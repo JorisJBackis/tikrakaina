@@ -322,5 +322,10 @@ def calculate_confidence(features: dict) -> float:
     return round(confidence, 1)
 
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
+    import uvicorn, os
+    uvicorn.run(
+        app,
+        host="0.0.0.0",
+        port=int(os.getenv("PORT", "8000")),  # use Railway's port if available
+        reload=True
+    )
