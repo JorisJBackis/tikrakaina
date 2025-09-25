@@ -32,8 +32,10 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000",
         "http://localhost:3001",
-        "https://tikrakaina.vercel.app", # <--- Add this line
-        "https://www.yourcustomdomain.com" # <--- Add this line if you have a custom domain for frontend
+        "https://vilrent.lt",
+        "https://www.vilrent.lt",
+        "https://vilrent.com",
+        "https://www.vilrent.com"
     ],
     allow_credentials=True,
     allow_methods=["*"],
