@@ -18,9 +18,13 @@ import ast
 from geopy.geocoders import Nominatim
 from geopy.distance import geodesic
 import warnings
+import logging
 from base64 import b64decode
 
+
 warnings.filterwarnings("ignore", message="Could not find the number of physical cores")
+
+logger = logging.getLogger(__name__)
 
 # Model will be loaded in main.py and passed as parameter
 
