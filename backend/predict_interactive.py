@@ -6,7 +6,7 @@ Scrapes aruodas.lt listings and predicts rental prices using a trained model.
 
 import requests
 import random
-import re1
+import re
 import json
 from bs4 import BeautifulSoup
 import pandas as pd
@@ -17,6 +17,10 @@ import ast
 from geopy.geocoders import Nominatim
 from geopy.distance import geodesic
 import warnings
+import shap  # <--- NEW IMPORT: Import SHAP
+
+# import logging # <--- Removed logging since it's an interactive script for quick test
+#      If you need more verbose output, add it back.
 
 warnings.filterwarnings("ignore", message="Could not find the number of physical cores")
 
@@ -26,11 +30,19 @@ with open("model.pkl", "rb") as f:
     model = pickle.load(f)
 print("✅ Model loaded successfully!")
 
+# Initialize SHAP explainer once after model loading
+# For LightGBM (your model type), shap.TreeExplainer is the most efficient and accurate.
+# It's generally good to pass a small background dataset if available, but for TreeExplainer,
+# passing just the model is often sufficient for individual predictions.
+# explainer = shap.TreeExplainer(model, data=your_training_features_sample) # More advanced
+explainer = shap.TreeExplainer(model)  # <--- NEW: Initialize SHAP Explainer
+print("📊 SHAP Explainer initialized.")
+
 # Configuration
 BASE = "https://www.aruodas.lt/butu-nuoma/vilniuje/puslapis/{page}/"
 CITY_CENTER = (54.6872, 25.2797)  # Vilnius center coordinates
 
-# Browser simulation
+# Browser simulation (Note: Zyte API would replace this in your deployed backend)
 USER_AGENTS = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.2 Safari/605.1.15",
@@ -68,7 +80,7 @@ def _parse_dl_block(dl):
     out = {}
     if not dl:
         return out
-    
+
     for dt in dl.find_all("dt"):
         key = dt.get_text(strip=True).rstrip(":")
         dd = dt.find_next_sibling("dd")
@@ -104,7 +116,7 @@ def scrape_listing(url, session=None):
     """Scrape apartment listing data from aruodas.lt URL."""
     if session is None:
         session = make_session()
-    
+
     session.headers['User-Agent'] = random.choice(USER_AGENTS)
     resp = session.get(url, timeout=10)
     resp.raise_for_status()
@@ -112,7 +124,8 @@ def scrape_listing(url, session=None):
 
     # Parse apartment details
     details = _parse_dl_block(soup.find("dl", class_="obj-details"))
-    stats = _parse_dl_block(soup.find("div", class_="obj-stats").find("dl")) if soup.find("div", class_="obj-stats") else {}
+    stats = _parse_dl_block(soup.find("div", class_="obj-stats").find("dl")) if soup.find("div",
+                                                                                          class_="obj-stats") else {}
     details.update(stats)
 
     # Extract location from header
@@ -135,7 +148,7 @@ def _geocode_addr(addr: str):
         return None, None
     if addr in _GEOCODE_CACHE:
         return _GEOCODE_CACHE[addr]
-    
+
     try:
         loc = _geocoder.geocode(addr)
         if loc:
@@ -143,17 +156,18 @@ def _geocode_addr(addr: str):
             return loc.latitude, loc.longitude
     except Exception:
         pass
-    
+
     _GEOCODE_CACHE[addr] = (None, None)
     return None, None
 
 
 def add_primary_heating_dummies(df, source_col="Šildymas"):
     """Add heating type dummy variables."""
+
     def get_primary(s):
         if pd.isna(s):
             return "Kita"
-        
+
         if isinstance(s, (list, tuple, set)):
             items = list(s)
         else:
@@ -164,21 +178,21 @@ def add_primary_heating_dummies(df, source_col="Šildymas"):
                     items = ast.literal_eval(str(s))
                 except Exception:
                     return "Kita"
-        
+
         if not items:
             return "Kita"
-        
+
         first = str(items[0])
         m = re.match(r"^([^ ,]+)", first)
         return m.group(1) if m else "Kita"
 
     prim = df[source_col].map(get_primary).astype("category")
-    
+
     df = df.copy()
     df["heat_Centrinis"] = (prim == "Centrinis").astype(int)
     df["heat_Dujinis"] = (prim == "Dujinis").astype(int)
     df["heat_Elektra"] = (prim == "Elektra").astype(int)
-    
+
     return df
 
 
@@ -194,7 +208,7 @@ def _parse_number(text):
     """Return float from text like '129 m²' or '45,5 m²'; NaN if none."""
     if text is None or (isinstance(text, float) and pd.isna(text)):
         return np.nan
-    
+
     s = str(text).replace("\u00A0", " ").replace(",", ".")
     m = re.search(r"[-+]?\d+(?:\.\d+)?", s)
     return float(m.group(0)) if m else np.nan
@@ -210,7 +224,7 @@ def featurise(raw_dict, show_details=True):
         "Ypatybės": [],
         "Papildomos patalpos": [],
     }
-    
+
     for col, default in listlike_defaults.items():
         if col not in df.columns:
             df[col] = [json.dumps(default)]
@@ -221,7 +235,7 @@ def featurise(raw_dict, show_details=True):
     # Process building year
     df['Metai'] = (
         df.get('Metai', pd.Series([None]))
-          .astype(str).str.extract(r'(\d{4})', expand=False).astype(float)
+        .astype(str).str.extract(r'(\d{4})', expand=False).astype(float)
     )
     df['year_centered'] = df['Metai'] - 2000
 
@@ -231,20 +245,20 @@ def featurise(raw_dict, show_details=True):
     # Add amenity features
     df['has_lift'] = (
         df['Ypatybės']
-          .map(lambda s: 'Yra liftas' in (json.loads(s) if pd.notnull(s) else []))
-          .astype(int)
+        .map(lambda s: 'Yra liftas' in (json.loads(s) if pd.notnull(s) else []))
+        .astype(int)
     )
 
     df['has_balcony_terrace'] = (
         df['Papildomos patalpos']
-          .map(lambda s: any(x in {'Balkonas', 'Terasa'} for x in (json.loads(s) if pd.notnull(s) else [])))
-          .astype(int)
+        .map(lambda s: any(x in {'Balkonas', 'Terasa'} for x in (json.loads(s) if pd.notnull(s) else [])))
+        .astype(int)
     )
 
     df['has_parking_spot'] = (
         df['Papildomos patalpos']
-          .map(lambda s: 'Vieta automobiliui' in (json.loads(s) if pd.notnull(s) else []))
-          .astype(int)
+        .map(lambda s: 'Vieta automobiliui' in (json.loads(s) if pd.notnull(s) else []))
+        .astype(int)
     )
 
     # Process location and calculate distance
@@ -260,7 +274,7 @@ def featurise(raw_dict, show_details=True):
     if pd.isna(lat) or pd.isna(lon):
         if show_details:
             print("📍 Geocoding address...")
-        
+
         # Try with district first
         parts_with = [p for p in [city, district, street] if p]
         base_with = ", ".join(parts_with)
@@ -319,16 +333,16 @@ def featurise(raw_dict, show_details=True):
             df[col] = np.nan
 
     if show_details:
-        print("\n" + "="*40)
+        print("\n" + "=" * 40)
         print("🏠 APARTMENT FEATURES")
-        print("="*40)
+        print("=" * 40)
         feature_data = df[numeric_feats].iloc[0]
         for feature, value in feature_data.items():
             if pd.isna(value):
                 print(f"{feature:20}: Missing")
             else:
                 print(f"{feature:20}: {value:.2f}")
-        print("="*40)
+        print("=" * 40)
 
     return df[numeric_feats]
 
@@ -337,22 +351,46 @@ def predict_from_url(url, model, session=None, show_details=True):
     """Main function: scrape URL and predict rental price."""
     if show_details:
         print(f"🔍 Scraping: {url}")
-    
+
     raw = scrape_listing(url, session=session)
-    
+
     if show_details:
         print("⚙️  Processing apartment features...")
-    
+
     feats = featurise(raw, show_details=show_details)
-    
+
     if show_details:
         print("🤖 Making prediction...")
-    
+
     pred_pm2 = model.predict(feats)[0]
-    
+
     area = feats["area_m2"].iloc[0]
     total_price = pred_pm2 * area if pd.notnull(area) else None
-    
+
+    # --- NEW: SHAP Calculation and Print ---
+    if explainer is not None and model is not None:
+        print("\n📊 SHAP Feature Contributions:")
+        shap_values_array = explainer.shap_values(feats)
+
+        if isinstance(shap_values_array, list):  # For multi-output models, take the first output
+            shap_values_for_prediction = shap_values_array[0][0]
+        else:
+            shap_values_for_prediction = shap_values_array[0]
+
+        feature_names = feats.columns.tolist()
+        shap_feature_contributions = dict(zip(feature_names, shap_values_for_prediction))
+
+        # Sort by absolute value for readability
+        sorted_shap = sorted(shap_feature_contributions.items(), key=lambda item: abs(item[1]), reverse=True)
+
+        for feature, value in sorted_shap:
+            print(f"  {feature:20}: {value:+.2f} EUR")  # Print with sign and 2 decimal places
+        print("----------------------------------------")
+        print(f"  Base Value (Average): {explainer.expected_value:.2f} EUR")
+        print(
+            f"  Predicted Value:      {pred_pm2 * feats['area_m2'].iloc[0]:.2f} EUR (from SHAP sum approx)")  # Sum of base + SHAP values should approximate prediction
+    # --- END NEW SHAP ---
+
     return pred_pm2, total_price
 
 
@@ -360,28 +398,28 @@ def batch_predict(urls):
     """Predict prices for multiple URLs."""
     session = make_session()
     results = []
-    
+
     for i, url in enumerate(urls, 1):
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"🏠 APARTMENT {i}/{len(urls)}")
-        print('='*60)
-        
+        print('=' * 60)
+
         try:
             pred_price_pm2, total_price = predict_from_url(url, model, session=session)
-            
+
             print(f"\n💰 PREDICTION RESULTS:")
             print(f"   Price per m²: {pred_price_pm2:.2f} EUR/m²")
             if total_price:
                 print(f"   Total monthly rent: {total_price:.0f} EUR")
             else:
                 print(f"   Total monthly rent: Cannot calculate (missing area)")
-            
+
             results.append({
                 'url': url,
                 'price_per_m2': pred_price_pm2,
                 'total_price': total_price
             })
-            
+
         except Exception as e:
             print(f"❌ Error processing apartment {i}: {e}")
             results.append({
@@ -390,7 +428,7 @@ def batch_predict(urls):
                 'total_price': None,
                 'error': str(e)
             })
-    
+
     return results
 
 
@@ -398,36 +436,36 @@ def interactive_mode():
     """Interactive mode for testing apartments."""
     print("\n🏠 Welcome to the Lithuanian Apartment Price Predictor!")
     print("=" * 60)
-    
+
     while True:
         print("\nChoose an option:")
         print("1. Predict single apartment (paste URL)")
         print("2. Batch predict multiple apartments")
         print("3. Test with example apartments")
         print("4. Exit")
-        
+
         choice = input("\nEnter choice (1-4): ").strip()
-        
+
         if choice == "1":
             url = input("\nPaste aruodas.lt apartment URL: ").strip()
             if not url:
                 print("❌ No URL provided!")
                 continue
-                
+
             try:
-                print(f"\n{'='*60}")
+                print(f"\n{'=' * 60}")
                 pred_price_pm2, total_price = predict_from_url(url, model)
-                
+
                 print(f"\n💰 PREDICTION RESULTS:")
                 print(f"   Price per m²: {pred_price_pm2:.2f} EUR/m²")
                 if total_price:
                     print(f"   Total monthly rent: {total_price:.0f} EUR")
                 else:
                     print(f"   Total monthly rent: Cannot calculate (missing area)")
-                    
+
             except Exception as e:
                 print(f"❌ Error: {e}")
-        
+
         elif choice == "2":
             urls = []
             print("\nEnter apartment URLs (empty line to finish):")
@@ -436,7 +474,7 @@ def interactive_mode():
                 if not url:
                     break
                 urls.append(url)
-            
+
             if urls:
                 results = batch_predict(urls)
                 print(f"\n📊 BATCH RESULTS SUMMARY:")
@@ -450,18 +488,18 @@ def interactive_mode():
                         print(f"{i}. {price_str} | Total: {total_str}")
             else:
                 print("❌ No URLs provided!")
-        
+
         elif choice == "3":
             test_urls = [
                 "https://www.aruodas.lt/butu-nuoma-vilniuje-zirmunuose-olimpieciu-g-ypatingai-patogioje-vietoje-karaliaus-4-1304811/?search_pos=3",
                 "https://www.aruodas.lt/butu-nuoma-vilniuje-baltupiuose-baltupio-g-isnuomojamas-sviesus-ir-siltas-ju-kambariu-4-1275570/?search_pos=12"
             ]
             batch_predict(test_urls)
-        
+
         elif choice == "4":
             print("\n👋 Goodbye!")
             break
-        
+
         else:
             print("❌ Invalid choice! Please enter 1-4.")
 
