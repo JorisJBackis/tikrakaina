@@ -92,7 +92,8 @@ export default function NotionStyleVersion() {
     }, 1000)
 
     try {
-      const response = await fetch('http://localhost:8000/api/predict', {
+      const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL!;
+      const response = await fetch(`${API_BASE}/api/predict`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url })
@@ -102,12 +103,12 @@ export default function NotionStyleVersion() {
         const data = await response.json()
         setResult(data)
         setLoading(false)
-      }, 1)
+      }, 300)
     } catch (error) {
       setTimeout(() => {
         setLoading(false)
         alert('Analizė nepavyko. Bandykite dar kartą.')
-      }, 1)
+      }, 300)
     }
   }
 
@@ -122,7 +123,7 @@ export default function NotionStyleVersion() {
                 <div className="w-8 h-8 bg-gradient-to-br from-gray-700 to-gray-900 rounded-lg flex items-center justify-center">
                   <Hash className="h-5 w-5 text-white" />
                 </div>
-                <span className="text-lg font-medium">TikraKaina</span>
+                <span className="text-lg font-medium">VilRent</span>
                 <span className="text-xs bg-gray-100 px-2 py-1 rounded-md text-gray-600">6 metų patirtis</span>
               </div>
               <nav className="hidden md:flex items-center space-x-1">
@@ -162,7 +163,7 @@ export default function NotionStyleVersion() {
           </h1>
           
           <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
-            Profesionali platforma, analizuojanti 127,842 būstus su 99.4% tikslumu. 
+            Profesionali platforma, analizuojanti 127,842 būstus su 98.2% tikslumu.
             Sutaupykite tūkstančius eurų priimdami duomenimis pagrįstus sprendimus.
           </p>
 
@@ -182,7 +183,7 @@ export default function NotionStyleVersion() {
           <div className="flex justify-center space-x-8 text-sm text-gray-500">
             <span className="flex items-center"><Check className="h-4 w-4 mr-1 text-green-500" /> Nereikia kortelės</span>
             <span className="flex items-center"><Check className="h-4 w-4 mr-1 text-green-500" /> 30 sek analizė</span>
-            <span className="flex items-center"><Check className="h-4 w-4 mr-1 text-green-500" /> 99.4% tikslumas</span>
+            <span className="flex items-center"><Check className="h-4 w-4 mr-1 text-green-500" /> 98.2% tikslumas</span>
           </div>
         </div>
       </section>
@@ -369,7 +370,7 @@ export default function NotionStyleVersion() {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-400 text-sm">Tikslumas</span>
-                    <span className="font-mono">99.4%</span>
+                    <span className="font-mono">98.2%</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-400 text-sm">Atnaujinta</span>
@@ -453,8 +454,8 @@ export default function NotionStyleVersion() {
           <Accordion.Root type="single" collapsible className="space-y-2">
             {[
               {
-                q: 'Ką galiu gauti su TikraKaina?',
-                a: 'Gausite tikslų būsto vertinimą (99.4% tikslumas), detalią rinkos analizę, PDF ataskaitas, Excel duomenis ir galimybę gauti pranešimus apie neįvertintus skelbimus.'
+                q: 'Ką galiu gauti su VilRent?',
+                a: 'Gausite tikslų būsto vertinimą (98.2% tikslumas), detalią rinkos analizę, PDF ataskaitas, Excel duomenis ir galimybę gauti pranešimus apie neįvertintus skelbimus.'
               },
               {
                 q: 'Kaip veikia jūsų AI modelis?',

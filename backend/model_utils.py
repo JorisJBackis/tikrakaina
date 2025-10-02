@@ -11,20 +11,28 @@ import json
 from bs4 import BeautifulSoup
 import pandas as pd
 import pickle
+import os
 import numpy as np
 from datetime import datetime
 import ast
 from geopy.geocoders import Nominatim
 from geopy.distance import geodesic
 import warnings
+import logging
+from base64 import b64decode
+
 
 warnings.filterwarnings("ignore", message="Could not find the number of physical cores")
+
+logger = logging.getLogger(__name__)
 
 # Model will be loaded in main.py and passed as parameter
 
 # Configuration
 BASE = "https://www.aruodas.lt/butu-nuoma/vilniuje/puslapis/{page}/"
 CITY_CENTER = (54.6872, 25.2797)  # Vilnius center coordinates
+ZYTE_API_KEY = os.getenv("ZYTE_API_KEY")
+ZYTE_API_ENDPOINT = "https://api.zyte.com/v1/extract"
 
 # Browser simulation
 USER_AGENTS = [
@@ -49,14 +57,6 @@ COMMON_HEADERS = {
 _geocoder = Nominatim(user_agent="rent_model_geocoder", timeout=10)
 _GEOCODE_CACHE = {}
 
-
-def make_session():
-    """Create a web scraping session with proper headers."""
-    sess = requests.Session()
-    sess.headers.update(COMMON_HEADERS)
-    # Prime cookies or JS challenges
-    sess.get("https://www.aruodas.lt/butu-nuoma/vilniuje/", timeout=5)
-    return sess
 
 
 def _parse_dl_block(dl):
@@ -96,33 +96,66 @@ def _extract_location_from_title(soup):
     return city, district, street
 
 
-def scrape_listing(url, session=None):
-    """Scrape apartment listing data from aruodas.lt URL."""
-    if session is None:
-        session = make_session()
-    
-    session.headers['User-Agent'] = random.choice(USER_AGENTS)
-    resp = session.get(url, timeout=10)
-    resp.raise_for_status()
-    soup = BeautifulSoup(resp.text, "html.parser")
+def scrape_listing(url: str) -> dict:
+    """
+    Scrape apartment listing data using Zyte API,
+    decoding the Base64 httpResponseBody.
+    """
+    if not ZYTE_API_KEY:
+        logger.error("ZYTE_API_KEY environment variable is not set. Cannot use Zyte API.")
+        raise ValueError("Zyte API Key is missing. Cannot scrape.")
 
-    # Parse apartment details
-    details = _parse_dl_block(soup.find("dl", class_="obj-details"))
-    stats = _parse_dl_block(soup.find("div", class_="obj-stats").find("dl")) if soup.find("div", class_="obj-stats") else {}
-    details.update(stats)
+    try:
+        logger.info(f"Scraping {url} via Zyte API (optimized, no JS rendering)...")
 
-    # Extract location from header
-    city, district, street = _extract_location_from_title(soup)
-    if city:
-        details["city"] = [city]
-    if district:
-        details["district"] = [district]
-    if street:
-        details["street"] = [street]
+        # Make the request to Zyte API using their specified auth method
+        api_response = requests.post(
+            ZYTE_API_ENDPOINT,
+            auth=(ZYTE_API_KEY, ""), # <--- AUTHENTICATION AS PER ZYTE SNIPPET
+            json={
+                "url": url, # <--- DYNAMICALLY USE THE USER'S URL
+                "httpResponseBody": True, # Request the raw HTTP response body
+                "followRedirect": True, # Follow redirects
+            },
+            timeout=30 # Keep a reasonable timeout
+        )
+        api_response.raise_for_status() # Raise an exception for HTTP errors (4xx or 5xx) from Zyte
 
-    result = {"url": url}
-    result.update(details)
-    return result
+        response_json = api_response.json()
+
+        # Check if httpResponseBody is present and decode it
+        if not response_json.get("httpResponseBody"):
+            raise ValueError("Zyte API did not return httpResponseBody in the response.")
+
+        # Decode the Base64 encoded HTML body
+        http_response_body_bytes: bytes = b64decode(response_json["httpResponseBody"])
+        
+        # BeautifulSoup parses the decoded HTML content
+        soup = BeautifulSoup(http_response_body_bytes, "html.parser")
+
+        # --- Your existing parsing logic for Aruodas.lt starts here, completely unchanged ---
+        details = _parse_dl_block(soup.find("dl", class_="obj-details"))
+        stats = _parse_dl_block(soup.find("div", class_="obj-stats").find("dl")) if soup.find("div", class_="obj-stats") else {}
+        details.update(stats)
+
+        city, district, street = _extract_location_from_title(soup)
+        if city: details["city"] = [city]
+        if district: details["district"] = [district]
+        if street: details["street"] = [street]
+
+        result = {"url": url}
+        result.update(details)
+        return result
+
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Error calling Zyte API: {e}")
+        raise RuntimeError(f"Failed to fetch listing via Zyte API: {e}")
+    except ValueError as e:
+        logger.error(f"Zyte API response processing error: {e}", exc_info=True)
+        raise RuntimeError(f"Failed to process Zyte API response: {e}")
+    except Exception as e:
+        logger.error(f"General error during scraping or Aruodas HTML parsing: {e}", exc_info=True)
+        raise RuntimeError(f"Failed to parse listing details from Aruodas.lt: {e}")
 
 
 def _geocode_addr(addr: str):
