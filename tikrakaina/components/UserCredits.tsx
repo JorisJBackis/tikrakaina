@@ -27,7 +27,7 @@ export default function UserCredits({ userId, onBuyCredits }: UserCreditsProps) 
           table: 'user_credits',
           filter: `user_id=eq.${userId}`
         },
-        (payload) => {
+        (payload: any) => {
           setCredits(payload.new.credits)
         }
       )
