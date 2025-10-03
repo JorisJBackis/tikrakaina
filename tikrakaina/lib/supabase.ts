@@ -26,7 +26,7 @@ export async function getUserCredits(userId: string) {
   return data?.credits || 0
 }
 
-export async function useCredits(userId: string, creditsToUse: number = 1) {
+export async function deductCredits(userId: string, creditsToUse: number = 1) {
   const { data, error } = await supabase
     .rpc('use_credits', {
       user_id_input: userId,

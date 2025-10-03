@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import * as Accordion from '@radix-ui/react-accordion'
 import { LineChart, Line, AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ScatterChart, Scatter } from 'recharts'
 import { Zap, Check, ChevronDown, Bell, ArrowRight, Sparkles, Hash, Filter, Search, Command, FileText, Download, CreditCard, Gauge, LogOut } from 'lucide-react'
-import { supabase, getUserCredits, useCredits, savePrediction, saveRentalTrainingData } from '@/lib/supabase'
+import { supabase, getUserCredits, deductCredits, savePrediction, saveRentalTrainingData } from '@/lib/supabase'
 import AuthModal from '@/components/AuthModal'
 import BuyCreditsModal from '@/components/BuyCreditsModal'
 import UserCredits from '@/components/UserCredits'
@@ -202,7 +202,7 @@ export default function NotionStyleVersion() {
 
     // Use credits and persist prediction
     if (user) {
-      await useCredits(user.id, 1);
+      await deductCredits(user.id, 1);
       await savePrediction(
         user.id,
         inputMethod === "url" ? url : null,
