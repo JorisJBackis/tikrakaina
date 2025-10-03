@@ -50,11 +50,17 @@ export async function addCredits(userId: string, creditsToAdd: number) {
   
   const newCredits = (currentCredits?.credits || 0) + creditsToAdd
   
+  const { data: currentData } = await supabase
+    .from('user_credits')
+    .select('total_purchased')
+    .eq('user_id', userId)
+    .single()
+
   const { error } = await supabase
     .from('user_credits')
-    .update({ 
+    .update({
       credits: newCredits,
-      total_purchased: supabase.sql`total_purchased + ${creditsToAdd}`
+      total_purchased: (currentData?.total_purchased || 0) + creditsToAdd
     })
     .eq('user_id', userId)
   
