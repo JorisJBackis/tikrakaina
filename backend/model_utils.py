@@ -20,6 +20,10 @@ from geopy.distance import geodesic
 import warnings
 import logging
 from base64 import b64decode
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 
 warnings.filterwarnings("ignore", message="Could not find the number of physical cores")
