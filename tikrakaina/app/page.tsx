@@ -1,10 +1,14 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import * as Accordion from '@radix-ui/react-accordion'
 import { LineChart, Line, AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ScatterChart, Scatter } from 'recharts'
-import { Zap, Check, ChevronDown, Bell, ArrowRight, Sparkles, Hash, Filter, Search, Command, FileText, Download, CreditCard, Gauge } from 'lucide-react'
+import { Zap, Check, ChevronDown, Bell, ArrowRight, Sparkles, Hash, Filter, Search, Command, FileText, Download, CreditCard, Gauge, LogOut } from 'lucide-react'
+import { supabase, getUserCredits, useCredits, savePrediction, saveRentalTrainingData } from '@/lib/supabase'
+import AuthModal from '@/components/AuthModal'
+import BuyCreditsModal from '@/components/BuyCreditsModal'
+import UserCredits from '@/components/UserCredits'
 
 // Merged Version 4: Notion-Style Clean (Lithuanian)
 export default function NotionStyleVersion() {
@@ -13,6 +17,30 @@ export default function NotionStyleVersion() {
   const [result, setResult] = useState<any>(null)
   const [loadingProgress, setLoadingProgress] = useState(0)
   const [selectedPlan, setSelectedPlan] = useState('starter')
+  const [isRenting, setIsRenting] = useState<boolean | null>(null)
+  const [inputMethod, setInputMethod] = useState<'url' | 'manual'>('url')
+  const [manualData, setManualData] = useState({
+    rooms: '',
+    area_m2: '',
+    floor_current: '',
+    floor_total: '',
+    year_centered: '',
+    dist_to_center_km: '',
+    has_lift: false,
+    has_balcony_terrace: false,
+    has_parking_spot: false,
+    heat_Centrinis: false,
+    heat_Dujinis: false,
+    heat_Elektra: false
+  })
+  const [actualRentPrice, setActualRentPrice] = useState('')
+
+  // Authentication states
+  const [user, setUser] = useState<any>(null)
+  const [userCredits, setUserCredits] = useState(0)
+  const [showAuthModal, setShowAuthModal] = useState(false)
+  const [showBuyCreditsModal, setShowBuyCreditsModal] = useState(false)
+  const [checkingAuth, setCheckingAuth] = useState(true)
 
   // Scatter plot data for price vs size
   const scatterData = Array.from({ length: 50 }, (_, i) => ({
@@ -20,6 +48,39 @@ export default function NotionStyleVersion() {
     y: 400 + Math.random() * 800,
     z: Math.random() * 5
   }))
+
+  // Check authentication on mount
+  useEffect(() => {
+    checkAuth()
+
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      setUser(session?.user || null)
+      if (session?.user) {
+        const credits = await getUserCredits(session.user.id)
+        setUserCredits(credits)
+      }
+    })
+
+    return () => {
+      authListener.subscription.unsubscribe()
+    }
+  }, [])
+
+  const checkAuth = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    setUser(user)
+    if (user) {
+      const credits = await getUserCredits(user.id)
+      setUserCredits(credits)
+    }
+    setCheckingAuth(false)
+  }
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+    setUser(null)
+    setUserCredits(0)
+  }
 
   const marketTrends = [
     { data: 'Sausis', naujienos: 3200, nuoma: 680, pardavimas: 890 },
@@ -75,42 +136,108 @@ export default function NotionStyleVersion() {
     }
   ]
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    setResult(null)
-    setLoadingProgress(0)
+ const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
 
-    const interval = setInterval(() => {
-      setLoadingProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(interval)
-          return 100
-        }
-        return prev + 3.33
-      })
-    }, 1000)
-
-    try {
-      const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL!;
-      const response = await fetch(`${API_BASE}/api/predict`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url })
-      })
-      
-      setTimeout(async () => {
-        const data = await response.json()
-        setResult(data)
-        setLoading(false)
-      }, 300)
-    } catch (error) {
-      setTimeout(() => {
-        setLoading(false)
-        alert('Analizė nepavyko. Bandykite dar kartą.')
-      }, 300)
-    }
+  // Auth / credits gates
+  if (!user) {
+    setShowAuthModal(true);
+    return;
   }
+  if (userCredits < 1) {
+    setShowBuyCreditsModal(true);
+    return;
+  }
+
+  setLoading(true);
+  setResult(null);
+  setLoadingProgress(0);
+
+  // Fake progress bar
+  const interval = setInterval(() => {
+    setLoadingProgress(prev => {
+      if (prev >= 100) {
+        clearInterval(interval);
+        return 100;
+      }
+      return prev + 3.33;
+    });
+  }, 1000);
+
+  // Build API base + endpoint safely (client-side env must be NEXT_PUBLIC_*)
+  const API_BASE = (process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000").replace(/\/+$/, "");
+  const endpoint = inputMethod === "url" ? "/api/predict" : "/api/predict-manual";
+
+  // Build request body
+  const requestBody =
+    inputMethod === "url"
+      ? { url }
+      : {
+          manual_data: {
+            ...manualData,
+            age_days: 20,
+            is_rental: isRenting
+          }
+        };
+
+  // Optional: hard timeout so UI never hangs
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30_000);
+
+  try {
+    const res = await fetch(`${API_BASE}${endpoint}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(requestBody),
+      signal: controller.signal
+    });
+
+    const data = await res.json();
+
+    setResult(data);
+
+    if (!res.ok || !data?.success) {
+      throw new Error(data?.message || `Request failed with ${res.status}`);
+    }
+
+    // Use credits and persist prediction
+    if (user) {
+      await useCredits(user.id, 1);
+      await savePrediction(
+        user.id,
+        inputMethod === "url" ? url : null,
+        inputMethod === "manual" ? manualData : null,
+        data,
+        Boolean(isRenting)
+      );
+
+      // If renting & manual, log training data
+      if (isRenting === true && inputMethod === "manual") {
+        const rentPrice = actualRentPrice ? parseFloat(actualRentPrice) : undefined;
+        await saveRentalTrainingData(
+          user.id,
+          manualData,
+          rentPrice,
+          url || undefined,
+          undefined,
+          rentPrice ? `User confirmed rent: €${rentPrice}/month` : "User is renting but did not provide price"
+        );
+      }
+
+      // Refresh visible credits
+      const newCredits = await getUserCredits(user.id);
+      setUserCredits(newCredits);
+    }
+  } catch (err) {
+    console.error(err);
+    alert("Analizė nepavyko. Bandykite dar kartą.");
+  } finally {
+    clearTimeout(timeoutId);
+    clearInterval(interval);
+    setLoading(false);
+    setLoadingProgress(100);
+  }
+};
 
   return (
     <div className="min-h-screen bg-white">
@@ -131,16 +258,56 @@ export default function NotionStyleVersion() {
                 <button className="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-md">Kainos</button>
                 <button className="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-md">Dokumentacija</button>
                 <button className="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-md">DUK</button>
+                <div className="flex items-center space-x-4 ml-4 pl-4 border-l border-gray-200">
+                  <div className="flex items-center space-x-1 text-xs text-gray-500">
+                    <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
+                    </svg>
+                    <span>+370 630 52110</span>
+                  </div>
+                  <div className="flex items-center space-x-1 text-xs text-gray-500">
+                    <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                    </svg>
+                    <span>Vytenio g. 50-3</span>
+                  </div>
+                </div>
               </nav>
             </div>
             <div className="flex items-center space-x-2">
               <button className="p-2 hover:bg-gray-100 rounded-md">
                 <Search className="h-4 w-4 text-gray-600" />
               </button>
-              <button className="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-md">Prisijungti</button>
-              <button className="px-3 py-1.5 bg-gray-900 text-white text-sm rounded-md hover:bg-gray-800">
-                Pradėti nemokamai
-              </button>
+              {user ? (
+                <>
+                  <UserCredits
+                    userId={user.id}
+                    onBuyCredits={() => setShowBuyCreditsModal(true)}
+                  />
+                  <button
+                    onClick={handleLogout}
+                    className="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-md flex items-center space-x-1"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    <span>Atsijungti</span>
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={() => setShowAuthModal(true)}
+                    className="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-md"
+                  >
+                    Prisijungti
+                  </button>
+                  <button
+                    onClick={() => setShowAuthModal(true)}
+                    className="px-3 py-1.5 bg-gray-900 text-white text-sm rounded-md hover:bg-gray-800"
+                  >
+                    Pradėti nemokamai
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -155,7 +322,7 @@ export default function NotionStyleVersion() {
             className="inline-flex items-center px-3 py-1 bg-yellow-50 border border-yellow-200 rounded-full text-yellow-800 text-sm mb-6"
           >
             <Sparkles className="h-4 w-4 mr-1" />
-            Sukurta Oksfordo statistikos studentų
+            Sukurta Oksfordo universiteto statistikos specialistų
           </motion.div>
           
           <h1 className="text-5xl font-bold text-gray-900 mb-4">
@@ -163,7 +330,7 @@ export default function NotionStyleVersion() {
           </h1>
           
           <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
-            Profesionali platforma, analizuojanti 127,842 būstus su 98.2% tikslumu.
+            Profesionali platforma, išanalizavusi virš 40,000 būstų su 98.2% tikslumu.
             Sutaupykite tūkstančius eurų priimdami duomenimis pagrįstus sprendimus.
           </p>
 
@@ -204,31 +371,286 @@ export default function NotionStyleVersion() {
                 </div>
 
                 {!loading && !result && (
-                  <form onSubmit={handleSubmit}>
-                    <div className="space-y-4">
-                      <div className="relative">
-                        <input
-                          type="url"
-                          value={url}
-                          onChange={(e) => setUrl(e.target.value)}
-                          placeholder="Įklijuokite aruodas.lt nuorodą..."
-                          className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                          required
-                        />
-                        <Command className="absolute right-3 top-3.5 h-5 w-5 text-gray-400" />
+                  <div className="space-y-6">
+                    {/* Rental Status Question */}
+                    {isRenting === null && (
+                      <div className="text-center py-8">
+                        <h3 className="text-lg font-semibold mb-4">Ar šiuo metu nuomojate būstą?</h3>
+                        <div className="flex justify-center space-x-4">
+                          <button
+                            onClick={() => {setIsRenting(true); setInputMethod('manual')}}
+                            className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium"
+                          >
+                            Taip, nuomoju
+                          </button>
+                          <button
+                            onClick={() => {setIsRenting(false); setInputMethod('url')}}
+                            className="px-6 py-3 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 font-medium"
+                          >
+                            Ne, nenuomoju
+                          </button>
+                        </div>
                       </div>
-                      
-                      <motion.button
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        type="submit"
-                        className="w-full py-3 bg-gray-900 text-white rounded-lg font-medium flex items-center justify-center space-x-2 hover:bg-gray-800"
-                      >
-                        <Zap className="h-5 w-5" />
-                        <span>Analizuoti dabar</span>
-                      </motion.button>
-                    </div>
-                  </form>
+                    )}
+
+                    {/* Input Method Selection */}
+                    {isRenting !== null && (
+                      <div>
+                        <div className="flex justify-center space-x-4 mb-6">
+                          <button
+                            onClick={() => setInputMethod('url')}
+                            className={`px-4 py-2 rounded-lg font-medium ${
+                              inputMethod === 'url' 
+                                ? 'bg-gray-900 text-white' 
+                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                            }`}
+                          >
+                            Aruodas.lt nuoroda
+                          </button>
+                          <button
+                            onClick={() => setInputMethod('manual')}
+                            className={`px-4 py-2 rounded-lg font-medium ${
+                              inputMethod === 'manual' 
+                                ? 'bg-gray-900 text-white' 
+                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                            }`}
+                          >
+                            Įvesti duomenis
+                          </button>
+                        </div>
+
+                        {inputMethod === 'url' ? (
+                          <form onSubmit={handleSubmit}>
+                            <div className="space-y-4">
+                              <div className="relative">
+                                <input
+                                  type="url"
+                                  value={url}
+                                  onChange={(e) => setUrl(e.target.value)}
+                                  placeholder="Įklijuokite aruodas.lt nuorodą..."
+                                  className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                                  required
+                                />
+                                <Command className="absolute right-3 top-3.5 h-5 w-5 text-gray-400" />
+                              </div>
+
+                              <motion.button
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
+                                type="submit"
+                                className="w-full py-3 bg-gray-900 text-white rounded-lg font-medium flex items-center justify-center space-x-2 hover:bg-gray-800"
+                              >
+                                <Zap className="h-5 w-5" />
+                                <span>Analizuoti dabar</span>
+                              </motion.button>
+                            </div>
+                          </form>
+                        ) : (
+                          <form onSubmit={handleSubmit}>
+                            <div className="space-y-6">
+                              {/* Basic Property Info */}
+                              <div>
+                                <h4 className="font-medium text-gray-900 mb-3">Būsto informacija</h4>
+                                <div className="grid grid-cols-2 gap-4">
+                                  <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Kambarių skaičius</label>
+                                    <input
+                                      type="number"
+                                      value={manualData.rooms}
+                                      onChange={(e) => setManualData({...manualData, rooms: e.target.value})}
+                                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-gray-900"
+                                      required
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Plotas (m²)</label>
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      value={manualData.area_m2}
+                                      onChange={(e) => setManualData({...manualData, area_m2: e.target.value})}
+                                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-gray-900"
+                                      required
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Aukštas</label>
+                                    <input
+                                      type="number"
+                                      value={manualData.floor_current}
+                                      onChange={(e) => setManualData({...manualData, floor_current: e.target.value})}
+                                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-gray-900"
+                                      required
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Iš viso aukštų</label>
+                                    <input
+                                      type="number"
+                                      value={manualData.floor_total}
+                                      onChange={(e) => setManualData({...manualData, floor_total: e.target.value})}
+                                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-gray-900"
+                                      required
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Building & Location */}
+                              <div>
+                                <h4 className="font-medium text-gray-900 mb-3">Pastato ir lokacijos duomenys</h4>
+                                <div className="grid grid-cols-2 gap-4">
+                                  <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Statybų metai (po 2000)</label>
+                                    <input
+                                      type="number"
+                                      value={manualData.year_centered}
+                                      onChange={(e) => setManualData({...manualData, year_centered: e.target.value})}
+                                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-gray-900"
+                                      placeholder="pvz. 6 (2006 metai)"
+                                      required
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Atstumas iki centro (km)</label>
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      value={manualData.dist_to_center_km}
+                                      onChange={(e) => setManualData({...manualData, dist_to_center_km: e.target.value})}
+                                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-gray-900"
+                                      required
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Amenities */}
+                              <div>
+                                <h4 className="font-medium text-gray-900 mb-3">Patogumai</h4>
+                                <div className="space-y-2">
+                                  <label className="flex items-center">
+                                    <input
+                                      type="checkbox"
+                                      checked={manualData.has_lift}
+                                      onChange={(e) => setManualData({...manualData, has_lift: e.target.checked})}
+                                      className="rounded border-gray-300 text-gray-900 focus:ring-gray-900"
+                                    />
+                                    <span className="ml-2 text-sm text-gray-700">Yra liftas</span>
+                                  </label>
+                                  <label className="flex items-center">
+                                    <input
+                                      type="checkbox"
+                                      checked={manualData.has_balcony_terrace}
+                                      onChange={(e) => setManualData({...manualData, has_balcony_terrace: e.target.checked})}
+                                      className="rounded border-gray-300 text-gray-900 focus:ring-gray-900"
+                                    />
+                                    <span className="ml-2 text-sm text-gray-700">Balkonas / terasa</span>
+                                  </label>
+                                  <label className="flex items-center">
+                                    <input
+                                      type="checkbox"
+                                      checked={manualData.has_parking_spot}
+                                      onChange={(e) => setManualData({...manualData, has_parking_spot: e.target.checked})}
+                                      className="rounded border-gray-300 text-gray-900 focus:ring-gray-900"
+                                    />
+                                    <span className="ml-2 text-sm text-gray-700">Parkavimo vieta</span>
+                                  </label>
+                                </div>
+                              </div>
+
+                              {/* Heating */}
+                              <div>
+                                <h4 className="font-medium text-gray-900 mb-3">Šildymas</h4>
+                                <div className="space-y-2">
+                                  <label className="flex items-center">
+                                    <input
+                                      type="radio"
+                                      name="heating"
+                                      checked={manualData.heat_Centrinis}
+                                      onChange={(e) => setManualData({...manualData, heat_Centrinis: true, heat_Dujinis: false, heat_Elektra: false})}
+                                      className="text-gray-900 focus:ring-gray-900"
+                                    />
+                                    <span className="ml-2 text-sm text-gray-700">Centrinis šildymas</span>
+                                  </label>
+                                  <label className="flex items-center">
+                                    <input
+                                      type="radio"
+                                      name="heating"
+                                      checked={manualData.heat_Dujinis}
+                                      onChange={(e) => setManualData({...manualData, heat_Centrinis: false, heat_Dujinis: true, heat_Elektra: false})}
+                                      className="text-gray-900 focus:ring-gray-900"
+                                    />
+                                    <span className="ml-2 text-sm text-gray-700">Dujinis šildymas</span>
+                                  </label>
+                                  <label className="flex items-center">
+                                    <input
+                                      type="radio"
+                                      name="heating"
+                                      checked={manualData.heat_Elektra}
+                                      onChange={(e) => setManualData({...manualData, heat_Centrinis: false, heat_Dujinis: false, heat_Elektra: true})}
+                                      className="text-gray-900 focus:ring-gray-900"
+                                    />
+                                    <span className="ml-2 text-sm text-gray-700">Elektrinis šildymas</span>
+                                  </label>
+                                  <label className="flex items-center">
+                                    <input
+                                      type="radio"
+                                      name="heating"
+                                      checked={!manualData.heat_Centrinis && !manualData.heat_Dujinis && !manualData.heat_Elektra}
+                                      onChange={(e) => setManualData({...manualData, heat_Centrinis: false, heat_Dujinis: false, heat_Elektra: false})}
+                                      className="text-gray-900 focus:ring-gray-900"
+                                    />
+                                    <span className="ml-2 text-sm text-gray-700">Kita</span>
+                                  </label>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Actual Rent Price - only show when user is renting */}
+                            {isRenting === true && (
+                              <div className="mt-6">
+                                <h4 className="font-medium text-gray-900 mb-3">Jūsų mokama nuomos kaina</h4>
+                                <div className="relative">
+                                  <input
+                                    type="number"
+                                    value={actualRentPrice}
+                                    onChange={(e) => setActualRentPrice(e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-gray-900"
+                                    placeholder="Įveskite dabartinę nuomos kainą (€/mėn)"
+                                  />
+                                  <p className="text-xs text-gray-500 mt-1">Neprivaloma, bet padės tobulinti modelį</p>
+                                </div>
+                              </div>
+                            )}
+
+                            <motion.button
+                              whileHover={{ scale: 1.02 }}
+                              whileTap={{ scale: 0.98 }}
+                              type="submit"
+                              className="w-full py-3 bg-gray-900 text-white rounded-lg font-medium flex items-center justify-center space-x-2 hover:bg-gray-800 mt-6"
+                            >
+                              <Zap className="h-5 w-5" />
+                              <span>Analizuoti duomenis</span>
+                            </motion.button>
+                          </form>
+                        )}
+
+                        <div className="mt-4">
+                          <button
+                            onClick={() => {setIsRenting(null); setUrl(''); setActualRentPrice(''); setManualData({
+                              rooms: '', area_m2: '', floor_current: '', floor_total: '', year_centered: '',
+                              dist_to_center_km: '', has_lift: false, has_balcony_terrace: false,
+                              has_parking_spot: false, heat_Centrinis: false, heat_Dujinis: false, heat_Elektra: false
+                            })}}
+                            className="text-sm text-gray-500 hover:text-gray-700"
+                          >
+                            ← Grįžti atgal
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 )}
 
                 {loading && (
@@ -366,7 +788,7 @@ export default function NotionStyleVersion() {
                 <div className="space-y-3">
                   <div className="flex justify-between">
                     <span className="text-gray-400 text-sm">Analizuota</span>
-                    <span className="font-mono">127,842</span>
+                    <span className="font-mono">42,132</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-400 text-sm">Tikslumas</span>
@@ -483,6 +905,24 @@ export default function NotionStyleVersion() {
           </Accordion.Root>
         </div>
       </section>
+      {/* Authentication Modal */}
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        onSuccess={() => {
+          checkAuth()
+          setShowAuthModal(false)
+        }}
+      />
+
+      {/* Buy Credits Modal */}
+      {user && (
+        <BuyCreditsModal
+          isOpen={showBuyCreditsModal}
+          onClose={() => setShowBuyCreditsModal(false)}
+          userId={user.id}
+        />
+      )}
     </div>
   )
 }

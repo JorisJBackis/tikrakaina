@@ -58,6 +58,25 @@ class PredictionRequest(BaseModel):
     url: HttpUrl = Field(..., description="Aruodas.lt listing URL")
     user_id: Optional[str] = Field(None, description="User ID for tracking")
 
+class ManualDataRequest(BaseModel):
+    rooms: int
+    area_m2: float
+    floor_current: int
+    floor_total: int
+    year_centered: int
+    dist_to_center_km: float
+    has_lift: bool
+    has_balcony_terrace: bool
+    has_parking_spot: bool
+    heat_Centrinis: bool
+    heat_Dujinis: bool
+    heat_Elektra: bool
+    age_days: int = 20
+    is_rental: bool
+
+class ManualPredictionRequest(BaseModel):
+    manual_data: ManualDataRequest
+
 class PredictionResponse(BaseModel):
     success: bool
     price_per_m2: Optional[float] = None
@@ -197,6 +216,72 @@ async def predict(request: PredictionRequest):
         return PredictionResponse(
             success=False,
             error=f"Failed to process listing: {str(e)}"
+        )
+
+@app.post("/api/predict-manual", response_model=PredictionResponse)
+async def predict_manual(request: ManualPredictionRequest):
+    """
+    Predict rental price from manually entered property data
+    """
+    if model is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Model not loaded"
+        )
+    
+    try:
+        data = request.manual_data
+        
+        # Create a DataFrame with the manual data in the format expected by the model
+        features_df = pd.DataFrame([{
+            'rooms': data.rooms,
+            'area_m2': data.area_m2,
+            'floor_current': data.floor_current,
+            'floor_total': data.floor_total,
+            'year_centered': data.year_centered,
+            'dist_to_center_km': data.dist_to_center_km,
+            'has_lift': int(data.has_lift),
+            'has_balcony_terrace': int(data.has_balcony_terrace),
+            'has_parking_spot': int(data.has_parking_spot),
+            'heat_Centrinis': int(data.heat_Centrinis),
+            'heat_Dujinis': int(data.heat_Dujinis),
+            'heat_Elektra': int(data.heat_Elektra),
+            'age_days': data.age_days
+        }])
+        
+        logger.info(f"Making prediction with manual data: {features_df.iloc[0].to_dict()}")
+        
+        # Make prediction
+        pred_price_pm2 = model.predict(features_df)[0]
+        total_price = pred_price_pm2 * data.area_m2
+        
+        # Calculate confidence (mock for now, based on data completeness)
+        confidence = 95.0  # High confidence for complete manual data
+        
+        # Analysis based on the data
+        analysis = {
+            "value_rating": "FAIR" if pred_price_pm2 < 15 else "GOOD" if pred_price_pm2 < 18 else "EXCELLENT",
+            "location_rating": "EXCELLENT" if data.dist_to_center_km < 3 else "GOOD" if data.dist_to_center_km < 7 else "BASIC",
+            "amenities_rating": "EXCELLENT" if (data.has_lift + data.has_balcony_terrace + data.has_parking_spot) >= 2 else "GOOD" if (data.has_lift + data.has_balcony_terrace + data.has_parking_spot) == 1 else "BASIC"
+        }
+        
+        result = PredictionResponse(
+            success=True,
+            price_per_m2=round(pred_price_pm2, 2),
+            total_price=round(total_price, 2),
+            confidence=confidence,
+            features=features_df.iloc[0].to_dict(),
+            analysis=analysis
+        )
+        
+        logger.info(f"Manual prediction successful: €{result.price_per_m2}/m² (€{result.total_price} total)")
+        return result
+        
+    except Exception as e:
+        logger.error(f"Failed to process manual data: {str(e)}")
+        return PredictionResponse(
+            success=False,
+            error=f"Failed to process manual data: {str(e)}"
         )
 
 @app.get("/api/stats", response_model=StatsResponse)
