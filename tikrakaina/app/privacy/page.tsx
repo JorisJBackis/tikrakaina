@@ -6,7 +6,7 @@ export default function PrivacyPolicy() {
         <p className="text-gray-600 mb-8"><strong>Paskutinį kartą atnaujinta:</strong> 2025 m. spalio 3 d.</p>
 
         <div className="prose max-w-none">
-          <p>Ši Privatumo politika paaiškina, kaip Joris Jean Bačkis, veikiantis pagal individualios veiklos pažymą Nr. 1457545 (toliau – „mes", „mūsų"), renka, naudoja ir saugo jūsų asmeninę informaciją, kai lankotės mūsų interneto svetainėje vilrent.lt (toliau – „Svetainė") ir naudojatės joje teikiamomis paslaugomis.</p>
+          <p>Ši Privatumo politika paaiškina, kaip Joris Jean Bačkis, veikiantis pagal individualios veiklos pažymą Nr. 1457545 (toliau – &ldquo;mes&rdquo;, &ldquo;mūsų&rdquo;), renka, naudoja ir saugo jūsų asmeninę informaciją, kai lankotės mūsų interneto svetainėje vilrent.lt (toliau – &ldquo;Svetainė&rdquo;) ir naudojatės joje teikiamomis paslaugomis.</p>
 
           <p>Mes gerbiame jūsų privatumą ir esame įsipareigoję saugoti jūsų asmens duomenis, vadovaudamiesi Bendruoju duomenų apsaugos reglamentu (BDAR) ir kitais taikytinais teisės aktais.</p>
 
@@ -49,7 +49,7 @@ export default function PrivacyPolicy() {
           <ul className="list-disc pl-6 space-y-2">
             <li>Susipažinti su savo asmens duomenimis.</li>
             <li>Reikalauti ištaisyti netikslius duomenis.</li>
-            <li>Reikalauti ištrinti savo duomenis („teisė būti pamirštam"), esant tam tikroms sąlygoms.</li>
+            <li>Reikalauti ištrinti savo duomenis (&ldquo;teisė būti pamirštam&rdquo;), esant tam tikroms sąlygoms.</li>
             <li>Apriboti savo duomenų tvarkymą.</li>
             <li>Nesutikti su duomenų tvarkymu.</li>
           </ul>
