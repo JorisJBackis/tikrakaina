@@ -9,6 +9,7 @@ import { supabase, getUserCredits, deductCredits, savePrediction, saveRentalTrai
 import AuthModal from '@/components/AuthModal'
 import BuyCreditsModal from '@/components/BuyCreditsModal'
 import UserCredits from '@/components/UserCredits'
+import Footer from '@/components/Footer'
 
 // Merged Version 4: Notion-Style Clean (Lithuanian)
 export default function NotionStyleVersion() {
@@ -330,7 +331,7 @@ export default function NotionStyleVersion() {
           </h1>
           
           <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
-            Profesionali platforma, išanalizavusi virš 40,000 būstų su 98.2% tikslumu.
+            Profesionali platforma, išanalizavusi virš 40 000 būstų su 98.2% tikslumu.
             Sutaupykite tūkstančius eurų priimdami duomenimis pagrįstus sprendimus.
           </p>
 
@@ -881,7 +882,7 @@ export default function NotionStyleVersion() {
               },
               {
                 q: 'Kaip veikia jūsų AI modelis?',
-                a: 'Naudojame LightGBM algoritmą, apmokytą su 127,842 realių sandorių duomenimis. Analizuojame 47 parametrus: lokaciją, plotą, aukštą, metus, infrastruktūrą ir kt.'
+                a: 'Naudojame LightGBM algoritmą, apmokytą su 40 000+ realių sandorių duomenimis. Analizuojame 47 parametrus: lokaciją, plotą, aukštą, metus, infrastruktūrą ir kt.'
               },
               {
                 q: 'Kas esate?',
@@ -923,6 +924,9 @@ export default function NotionStyleVersion() {
           userId={user.id}
         />
       )}
+
+      {/* Footer */}
+      <Footer />
     </div>
   )
 }
