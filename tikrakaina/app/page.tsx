@@ -245,32 +245,35 @@ export default function NotionStyleVersion() {
       {/* Notion-style Header */}
       <header className="border-b border-gray-200 bg-white/80 backdrop-blur sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4">
-          <div className="flex justify-between items-center h-14">
-            <div className="flex items-center space-x-8">
-              <div className="flex items-center space-x-2">
-                <div className="w-8 h-8 bg-gradient-to-br from-gray-700 to-gray-900 rounded-lg flex items-center justify-center">
-                  <Hash className="h-5 w-5 text-white" />
-                </div>
-                <span className="text-lg font-medium">VilRent</span>
-                <span className="text-xs bg-gray-100 px-2 py-1 rounded-md text-gray-600">6 metų patirtis</span>
+          <div className="flex justify-between items-center h-16">
+            <div className="flex items-center space-x-6">
+              <div className="flex items-center space-x-2.5">
+                <img src="/logo.png" alt="VilRent Logo" className="h-10 w-auto object-contain" />
+                <span className="text-2xl font-bold tracking-tight bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 bg-clip-text text-transparent" style={{ fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", letterSpacing: '-0.02em' }}>VilRent</span>
+                <span className="text-xs bg-gray-100 px-2 py-1 rounded-md text-gray-600 font-medium">8 metų patirtis</span>
               </div>
               <nav className="hidden md:flex items-center space-x-1">
-                <button className="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-md">Produktas</button>
                 <button className="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-md">Kainos</button>
-                <button className="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-md">Dokumentacija</button>
                 <button className="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-md">DUK</button>
-                <div className="flex items-center space-x-4 ml-4 pl-4 border-l border-gray-200">
-                  <div className="flex items-center space-x-1 text-xs text-gray-500">
-                    <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
+                <div className="flex items-center space-x-5 ml-4 pl-4 border-l border-gray-200">
+                  <div className="flex items-center space-x-1.5 text-sm text-gray-600">
+                    <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
                       <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
                     </svg>
                     <span>+370 630 52110</span>
                   </div>
-                  <div className="flex items-center space-x-1 text-xs text-gray-500">
-                    <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
+                  <div className="flex items-center space-x-1.5 text-sm text-gray-600">
+                    <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
                     </svg>
                     <span>Vytenio g. 50-3</span>
+                  </div>
+                  <div className="flex items-center space-x-1.5 text-sm text-gray-600">
+                    <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" />
+                      <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" />
+                    </svg>
+                    <span>support@vilrent.lt</span>
                   </div>
                 </div>
               </nav>
