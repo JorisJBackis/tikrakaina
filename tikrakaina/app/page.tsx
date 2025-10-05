@@ -317,6 +317,31 @@ export default function NotionStyleVersion() {
         </div>
       </header>
 
+      {/* SumUp Verification Banner - PROMINENT FOR REVIEWERS */}
+      <div className="bg-gradient-to-r from-green-500 to-emerald-600 py-4 px-4">
+        <div className="max-w-7xl mx-auto">
+          <a
+            href="/sumup-test"
+            className="flex items-center justify-center space-x-4 text-white hover:opacity-90 transition-opacity"
+          >
+            <div className="flex items-center space-x-3">
+              <div className="p-2 bg-white/20 rounded-lg">
+                <CreditCard className="h-8 w-8" />
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold uppercase tracking-wider">
+                   SUMUP VERIFICATION GATEWAY
+                </div>
+                <div className="text-sm opacity-90 mt-1">
+                  Click here to test payment integration • For SumUp Review Team
+                </div>
+              </div>
+            </div>
+            <ArrowRight className="h-6 w-6 animate-pulse" />
+          </a>
+        </div>
+      </div>
+
       {/* Hero Section */}
       <section className="py-20 px-4">
         <div className="max-w-4xl mx-auto text-center">

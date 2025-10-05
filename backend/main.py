@@ -15,6 +15,9 @@ from pathlib import Path
 # Import our model utilities
 from model_utils import scrape_listing, featurise, predict_from_url
 
+# Import SumUp routes
+from sumup_routes import router as sumup_router, webhook_router
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -52,6 +55,10 @@ try:
 except Exception as e:
     logger.error(f"Failed to load model: {e}")
     model = None
+
+# Include routers
+app.include_router(sumup_router)
+app.include_router(webhook_router)
 
 # Pydantic models for request/response
 class PredictionRequest(BaseModel):
