@@ -174,7 +174,7 @@ export interface Database {
         }
       }
     }
-    Views: {}
+    Views: Record<string, never>
     Functions: {
       use_credits: {
         Args: {
@@ -184,7 +184,7 @@ export interface Database {
         Returns: boolean
       }
       get_training_data_stats: {
-        Args: {}
+        Args: Record<string, never>
         Returns: {
           total_records: number
           verified_records: number
@@ -192,6 +192,6 @@ export interface Database {
         }[]
       }
     }
-    Enums: {}
+    Enums: Record<string, never>
   }
 }

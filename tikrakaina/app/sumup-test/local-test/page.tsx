@@ -63,11 +63,11 @@ export default function LocalTestPage() {
               <div>
                 <h2 className="text-lg font-semibold text-blue-900 mb-2">Local Testing Instructions</h2>
                 <ol className="text-blue-800 space-y-2 list-decimal list-inside">
-                  <li>Click "Pay €1 with SumUp" on the main test page</li>
+                  <li>Click &quot;Pay €1 with SumUp&quot; on the main test page</li>
                   <li>Copy the payment reference (ref) from the console logs</li>
                   <li>Complete the payment on SumUp</li>
                   <li>After SumUp redirects to production, come back here</li>
-                  <li>Paste the ref below and click "Finalize Payment"</li>
+                  <li>Paste the ref below and click &quot;Finalize Payment&quot;</li>
                 </ol>
                 <p className="mt-3 text-sm text-blue-700">
                   This simulates the callback that would normally happen automatically in production.
