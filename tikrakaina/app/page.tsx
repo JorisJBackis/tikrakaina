@@ -68,13 +68,36 @@ export default function NotionStyleVersion() {
   }, [])
 
   const checkAuth = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    setUser(user)
-    if (user) {
-      const credits = await getUserCredits(user.id)
-      setUserCredits(credits)
+    try {
+      // Use getSession() instead of getUser() to properly restore session
+      const { data: { session }, error } = await supabase.auth.getSession()
+
+      if (error) {
+        console.error('Session error:', error)
+        setUser(null)
+        setUserCredits(0)
+        setCheckingAuth(false)
+        return
+      }
+
+      const user = session?.user || null
+      setUser(user)
+
+      if (user) {
+        console.log('User authenticated:', user.id)
+        const credits = await getUserCredits(user.id)
+        console.log('Credits loaded:', credits)
+        setUserCredits(credits)
+      } else {
+        console.log('No user session found')
+      }
+    } catch (err) {
+      console.error('Auth check failed:', err)
+      setUser(null)
+      setUserCredits(0)
+    } finally {
+      setCheckingAuth(false)
     }
-    setCheckingAuth(false)
   }
 
   const handleLogout = async () => {
