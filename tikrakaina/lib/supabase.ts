@@ -27,18 +27,58 @@ export async function getUserCredits(userId: string) {
 }
 
 export async function deductCredits(userId: string, creditsToUse: number = 1) {
-  const { data, error } = await supabase
+  console.log('🔵 Attempting to deduct credits:', { userId, creditsToUse })
+
+  // First, check current credits
+  const { data: currentData, error: fetchError } = await supabase
+    .from('user_credits')
+    .select('credits')
+    .eq('user_id', userId)
+    .single()
+
+  if (fetchError) {
+    console.error('❌ Error fetching current credits:', fetchError)
+    return false
+  }
+
+  console.log('📊 Current credits:', currentData?.credits)
+
+  if (!currentData || currentData.credits < creditsToUse) {
+    console.error('❌ Insufficient credits')
+    return false
+  }
+
+  // Try using RPC function first
+  const { data: rpcData, error: rpcError } = await supabase
     .rpc('use_credits', {
       user_id_input: userId,
       credits_to_use: creditsToUse
     })
-  
-  if (error) {
-    console.error('Error using credits:', error)
-    return false
+
+  if (rpcError) {
+    console.error('⚠️ RPC function error, falling back to direct update:', rpcError)
+
+    // Fallback: Direct update if RPC fails
+    const newCredits = currentData.credits - creditsToUse
+    const { error: updateError } = await supabase
+      .from('user_credits')
+      .update({
+        credits: newCredits,
+        updated_at: new Date().toISOString()
+      })
+      .eq('user_id', userId)
+
+    if (updateError) {
+      console.error('❌ Direct update also failed:', updateError)
+      return false
+    }
+
+    console.log('✅ Credits deducted via direct update. New balance:', newCredits)
+    return true
   }
-  
-  return data
+
+  console.log('✅ Credits deducted via RPC. Result:', rpcData)
+  return rpcData
 }
 
 export async function addCredits(userId: string, creditsToAdd: number) {

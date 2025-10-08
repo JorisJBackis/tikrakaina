@@ -92,7 +92,7 @@ export default function BuyCreditsModal({ isOpen, onClose, userId }: BuyCreditsM
           className="bg-white rounded-2xl max-w-2xl w-full p-6"
         >
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold text-gray-900">Pirkti kreditus</h2>
+            <h2 className="text-2xl font-bold text-gray-900">Pirkti analizes</h2>
             <button
               onClick={onClose}
               className="p-2 hover:bg-gray-100 rounded-lg"
@@ -126,13 +126,13 @@ export default function BuyCreditsModal({ isOpen, onClose, userId }: BuyCreditsM
                       <div className="text-3xl font-bold text-gray-900 mb-1">
                         {pkg.credits}
                       </div>
-                      <div className="text-sm text-gray-500 mb-3">kreditų</div>
-                      
+                      <div className="text-sm text-gray-500 mb-3">analizių</div>
+
                       <div className="text-2xl font-bold text-gray-900">
                         €{pkg.price}
                       </div>
                       <div className="text-xs text-gray-500">
-                        €{pkg.pricePerCredit.toFixed(2)}/kreditas
+                        €{pkg.pricePerCredit.toFixed(2)}/analizė
                       </div>
                       
                       {pkg.savings && (
@@ -158,7 +158,7 @@ export default function BuyCreditsModal({ isOpen, onClose, userId }: BuyCreditsM
                   <div>
                     <p className="text-sm text-gray-600">Pasirinkta:</p>
                     <p className="font-medium text-gray-900">
-                      {selectedPackage.credits} kreditų už €{selectedPackage.price}
+                      {selectedPackage.credits} {selectedPackage.credits === 1 ? 'analizė' : 'analizės'} už €{selectedPackage.price}
                     </p>
                   </div>
                   <button
@@ -185,7 +185,7 @@ export default function BuyCreditsModal({ isOpen, onClose, userId }: BuyCreditsM
                 Mokėjimas sėkmingas!
               </h3>
               <p className="text-gray-600">
-                {selectedPackage.credits} kreditai pridėti į jūsų paskyrą.
+                {selectedPackage.credits} {selectedPackage.credits === 1 ? 'analizė pridėta' : 'analizės pridėtos'} į jūsų paskyrą.
               </p>
             </div>
           )}

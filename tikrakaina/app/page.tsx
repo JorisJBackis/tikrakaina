@@ -78,9 +78,17 @@ export default function NotionStyleVersion() {
   }
 
   const handleLogout = async () => {
-    await supabase.auth.signOut()
-    setUser(null)
-    setUserCredits(0)
+    try {
+      await supabase.auth.signOut()
+      setUser(null)
+      setUserCredits(0)
+      // Reload page to ensure clean state
+      window.location.reload()
+    } catch (error) {
+      console.error('Logout error:', error)
+      // Force reload even on error
+      window.location.reload()
+    }
   }
 
   const marketTrends = [
@@ -154,14 +162,14 @@ export default function NotionStyleVersion() {
   setResult(null);
   setLoadingProgress(0);
 
-  // Fake progress bar
-  const interval = setInterval(() => {
+  // Progress bar animation over 30 seconds
+  const progressInterval = setInterval(() => {
     setLoadingProgress(prev => {
       if (prev >= 100) {
-        clearInterval(interval);
+        clearInterval(progressInterval);
         return 100;
       }
-      return prev + 3.33;
+      return prev + (100 / 30); // Increment to reach 100% in 30 seconds
     });
   }, 1000);
 
@@ -195,15 +203,27 @@ export default function NotionStyleVersion() {
 
     const data = await res.json();
 
-    setResult(data);
-
     if (!res.ok || !data?.success) {
       throw new Error(data?.message || `Request failed with ${res.status}`);
     }
 
-    // Use credits and persist prediction
+    // IMPORTANT: Deduct credits and save BEFORE showing results
     if (user) {
-      await deductCredits(user.id, 1);
+      console.log('🚨 STARTING CREDIT DEDUCTION FOR USER:', user.id);
+
+      // Deduct credits first
+      const creditDeducted = await deductCredits(user.id, 1);
+
+      console.log('🚨 CREDIT DEDUCTION RESULT:', creditDeducted);
+
+      if (!creditDeducted) {
+        console.error('❌ Failed to deduct credits');
+        alert('CRITICAL: Credit deduction failed! Check console.');
+      } else {
+        console.log('✅ Credit successfully deducted');
+      }
+
+      // Save prediction to history
       await savePrediction(
         user.id,
         inputMethod === "url" ? url : null,
@@ -225,16 +245,26 @@ export default function NotionStyleVersion() {
         );
       }
 
-      // Refresh visible credits
+      // Force refresh credits after deduction
       const newCredits = await getUserCredits(user.id);
+      console.log('💰 Fetched new credits:', newCredits);
       setUserCredits(newCredits);
+
+      // Force a small delay to ensure state updates
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      console.log('✅ All async operations complete. Showing results now.');
     }
+
+    // Show results ONLY after all async operations are done
+    setResult(data);
+
   } catch (err) {
     console.error(err);
     alert("Analizė nepavyko. Bandykite dar kartą.");
   } finally {
+    clearInterval(progressInterval);
     clearTimeout(timeoutId);
-    clearInterval(interval);
     setLoading(false);
     setLoadingProgress(100);
   }
@@ -285,6 +315,7 @@ export default function NotionStyleVersion() {
               {user ? (
                 <>
                   <UserCredits
+                    key={userCredits}
                     userId={user.id}
                     onBuyCredits={() => setShowBuyCreditsModal(true)}
                   />
