@@ -8,22 +8,55 @@ import { createClient } from '@supabase/supabase-js'
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.error('❌ Supabase environment variables are not set!')
+  console.error('NEXT_PUBLIC_SUPABASE_URL:', supabaseUrl ? 'Set' : 'Missing')
+  console.error('NEXT_PUBLIC_SUPABASE_ANON_KEY:', supabaseAnonKey ? 'Set' : 'Missing')
+}
+
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 // Helper functions for credits
-export async function getUserCredits(userId: string) {
-  const { data, error } = await supabase
-    .from('user_credits')
-    .select('credits')
-    .eq('user_id', userId)
-    .single()
-  
-  if (error) {
-    console.error('Error fetching credits:', error)
+export async function getUserCredits(userId: string, retries = 3): Promise<number> {
+  if (!userId) {
+    console.error('getUserCredits called with no userId')
     return 0
   }
-  
-  return data?.credits || 0
+
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const { data, error } = await supabase
+        .from('user_credits')
+        .select('credits')
+        .eq('user_id', userId)
+        .single()
+
+      if (error) {
+        console.error(`Error fetching credits (attempt ${attempt}/${retries}):`, error)
+
+        // If this is the last attempt, return 0
+        if (attempt === retries) {
+          return 0
+        }
+
+        // Wait before retrying (exponential backoff)
+        await new Promise(resolve => setTimeout(resolve, 500 * attempt))
+        continue
+      }
+
+      return data?.credits || 0
+    } catch (err) {
+      console.error(`Exception fetching credits (attempt ${attempt}/${retries}):`, err)
+
+      if (attempt === retries) {
+        return 0
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 500 * attempt))
+    }
+  }
+
+  return 0
 }
 
 export async function deductCredits(userId: string, creditsToUse: number = 1) {

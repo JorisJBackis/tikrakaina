@@ -14,14 +14,20 @@ export default function UserCredits({ userId, onBuyCredits }: UserCreditsProps) 
   const [loading, setLoading] = useState(true)
 
   const fetchCredits = useCallback(async () => {
-    if (!userId) return
+    if (!userId) {
+      console.error('fetchCredits: No userId provided')
+      return
+    }
 
+    console.log('🔍 Fetching credits for user:', userId)
     setLoading(true)
     try {
       const userCredits = await getUserCredits(userId)
+      console.log('✅ Credits fetched successfully:', userCredits)
       setCredits(userCredits)
     } catch (error) {
-      console.error('Error fetching credits:', error)
+      console.error('❌ Error fetching credits:', error)
+      // Don't set credits to 0 on error - keep previous value
     } finally {
       setLoading(false)
     }
