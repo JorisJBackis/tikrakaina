@@ -448,7 +448,8 @@ export default function NotionStyleVersion() {
   }
 
   setLoading(true);
-  setResult(null);
+  // Don't clear result - prevents white flash and scroll jump on mobile
+  // setResult(null);
 
   // 📊 Track analysis start
   trackEvent('analysis_started', {
