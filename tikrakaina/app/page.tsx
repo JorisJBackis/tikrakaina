@@ -45,6 +45,7 @@ export default function NotionStyleVersion() {
   const [addressSearchLoading, setAddressSearchLoading] = useState(false)
   const [districtExtraction, setDistrictExtraction] = useState<DistrictExtractionResult | null>(null)
   const [actualRentPrice, setActualRentPrice] = useState('')
+  const [manualRentNotYetRented, setManualRentNotYetRented] = useState(false)
   const [newsletterEmail, setNewsletterEmail] = useState('')
   const [newsletterStatus, setNewsletterStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
   const [newsletterMessage, setNewsletterMessage] = useState('')
@@ -488,6 +489,28 @@ export default function NotionStyleVersion() {
 
     //   console.log('✅ All async operations complete. Showing results now.');
     // }
+
+    // For manual mode with actual rent price, add comparison fields
+    if (inputMethod === 'manual' && actualRentPrice && parseFloat(actualRentPrice) > 0) {
+      const listingPrice = parseFloat(actualRentPrice);
+      const predictedPrice = data.total_price;
+      const priceDiff = listingPrice - predictedPrice;
+      const priceDiffPercent = ((priceDiff / predictedPrice) * 100).toFixed(1);
+
+      // Determine deal rating (same logic as backend)
+      let dealRating = 'FAIR_PRICE';
+      if (priceDiff < -50) {
+        dealRating = 'GOOD_DEAL';
+      } else if (priceDiff > 50) {
+        dealRating = 'OVERPRICED';
+      }
+
+      // Add comparison fields to data
+      data.listing_price = listingPrice;
+      data.price_difference = priceDiff;
+      data.price_difference_percent = parseFloat(priceDiffPercent);
+      data.deal_rating = dealRating;
+    }
 
     // Show results ONLY after all async operations are done
     setResult(data);
@@ -960,22 +983,23 @@ export default function NotionStyleVersion() {
                               </div>
                             </div>
 
-                            {/* Actual Rent Price - only show when user is renting */}
-                            {isRenting === true && (
-                              <div className="mt-6">
-                                <h4 className="font-medium text-gray-900 mb-3">Jūsų mokama nuomos kaina</h4>
-                                <div className="relative">
-                                  <input
-                                    type="number"
-                                    value={actualRentPrice}
-                                    onChange={(e) => setActualRentPrice(e.target.value)}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-gray-900"
-                                    placeholder="Įveskite dabartinę nuomos kainą (€/mėn)"
-                                  />
-                                  <p className="text-xs text-gray-500 mt-1">Neprivaloma, bet padės tobulinti modelį</p>
-                                </div>
+                            {/* Current Rent Price (Optional) */}
+                            <div className="mt-6">
+                              <h4 className="font-medium text-gray-900 mb-3">
+                                Už kiek šis butas dabar nuomojamas?
+                                <span className="text-sm font-normal text-gray-500"> (jei nenuomuojama - praleiskite)</span>
+                              </h4>
+                              <div className="relative">
+                                <input
+                                  type="number"
+                                  value={actualRentPrice}
+                                  onChange={(e) => setActualRentPrice(e.target.value)}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-gray-900"
+                                  placeholder="Įveskite nuomos kainą (€/mėn)"
+                                />
+                                <p className="text-xs text-gray-500 mt-1">Jei įvesite, pamatysite palyginimą su rinkos kaina</p>
                               </div>
-                            )}
+                            </div>
 
                             <motion.button
                               whileHover={{ scale: 1.02 }}
@@ -1090,19 +1114,22 @@ export default function NotionStyleVersion() {
                             </div>
                           </div>
                         ) : (
-                          /* Regular grid for manual entry (no price comparison) */
-                          <div className="grid grid-cols-3 gap-6">
-                            <div>
-                              <div className="text-3xl font-bold text-gray-900">€{Math.round(result.total_price)}</div>
-                              <div className="text-sm text-gray-500">per mėnesį</div>
+                          /* Sleek result display for manual entry without price comparison */
+                          <div className="space-y-4">
+                            <div className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg p-6">
+                              <div className="text-sm font-medium text-gray-600 mb-2">Nuomos kaina</div>
+                              <div className="text-4xl font-bold text-gray-900">€{Math.round(result.total_price)}</div>
+                              <div className="text-sm text-gray-500 mt-1">per mėnesį</div>
                             </div>
-                            <div>
-                              <div className="text-3xl font-bold text-gray-900">€{result.price_per_m2}</div>
-                              <div className="text-sm text-gray-500">už m²</div>
-                            </div>
-                            <div>
-                              <div className="text-3xl font-bold text-gray-900">{result.confidence}%</div>
-                              <div className="text-sm text-gray-500">patikimumas</div>
+                            <div className="grid grid-cols-2 gap-3">
+                              <div className="border border-gray-200 rounded-lg p-4 bg-white">
+                                <div className="text-xs font-medium text-gray-600 mb-1">Kaina už m²</div>
+                                <div className="text-2xl font-bold text-gray-900">€{result.price_per_m2}</div>
+                              </div>
+                              <div className="border border-gray-200 rounded-lg p-4 bg-white">
+                                <div className="text-xs font-medium text-gray-600 mb-1">Plotas</div>
+                                <div className="text-2xl font-bold text-gray-900">{result.area_m2 || '--'} m²</div>
+                              </div>
                             </div>
                           </div>
                         )}
