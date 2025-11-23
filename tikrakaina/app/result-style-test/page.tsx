@@ -262,7 +262,7 @@ export default function ResultStyleTest() {
                 You selected <span className="text-green-400 font-bold">Version {selected}</span>
               </p>
             ) : (
-              <p className="text-lg text-gray-400">Click "Pick" on your favorite design</p>
+              <p className="text-lg text-gray-400">Click &quot;Pick&quot; on your favorite design</p>
             )}
           </div>
         </div>

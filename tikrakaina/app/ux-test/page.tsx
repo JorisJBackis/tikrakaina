@@ -212,7 +212,7 @@ export default function UXTestPage() {
                 You selected <span className="text-green-400 font-bold">Version {selectedVersion}</span>
               </p>
             ) : (
-              <p className="text-lg text-gray-400">Click "Pick This" on your favorite design above</p>
+              <p className="text-lg text-gray-400">Click &quot;Pick This&quot; on your favorite design above</p>
             )}
           </div>
         </div>
