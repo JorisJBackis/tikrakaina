@@ -605,6 +605,14 @@ export default function NotionStyleVersion() {
     // Show results ONLY after all async operations are done
     setResult(data);
 
+    // Prevent auto-scroll on mobile - keep form in view
+    setTimeout(() => {
+      const formElement = document.querySelector('form');
+      if (formElement) {
+        formElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 100);
+
     // 📊 Track analysis completion
     trackEvent('analysis_completed', {
       input_method: inputMethod,
