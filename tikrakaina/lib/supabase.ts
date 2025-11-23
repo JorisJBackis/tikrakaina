@@ -327,3 +327,92 @@ export async function getAnalyticsStats(startDate?: string, endDate?: string) {
 
   return data
 }
+
+// ============================================
+// FREE TRIAL MANAGEMENT
+// ============================================
+
+// Track anonymous analysis (no account)
+export async function trackAnonymousAnalysis(fingerprint: string, ipAddress?: string) {
+  const { error } = await supabase
+    .from('anonymous_analyses')
+    .insert({
+      device_fingerprint: fingerprint,
+      ip_address: ipAddress || null,
+    })
+
+  if (error) {
+    console.error('Error tracking anonymous analysis:', error)
+    return false
+  }
+
+  return true
+}
+
+// Check if device/IP has used free trial
+export async function hasExceededFreeTrial(fingerprint: string, ipAddress?: string): Promise<boolean> {
+  // Check by fingerprint
+  const { data: fingerprintData, error: fingerprintError } = await supabase
+    .from('anonymous_analyses')
+    .select('id')
+    .eq('device_fingerprint', fingerprint)
+    .limit(1)
+
+  if (fingerprintError) {
+    console.error('Error checking free trial by fingerprint:', fingerprintError)
+  }
+
+  const fingerprintUsed = (fingerprintData?.length || 0) > 0
+
+  // Also check by IP if provided (adds extra security layer)
+  if (ipAddress) {
+    const { data: ipData, error: ipError } = await supabase
+      .from('anonymous_analyses')
+      .select('id')
+      .eq('ip_address', ipAddress)
+      .limit(1)
+
+    if (ipError) {
+      console.error('Error checking free trial by IP:', ipError)
+    }
+
+    const ipUsed = (ipData?.length || 0) > 0
+
+    // Block if EITHER fingerprint OR IP has been used
+    return fingerprintUsed || ipUsed
+  }
+
+  return fingerprintUsed
+}
+
+// Auto-grant credits on signup
+export async function initializeUserCredits(userId: string, initialCredits: number = 1) {
+  // Check if user already has credits
+  const { data: existing } = await supabase
+    .from('user_credits')
+    .select('credits')
+    .eq('user_id', userId)
+    .single()
+
+  if (existing) {
+    // User already has credits, don't override
+    return true
+  }
+
+  // Insert initial credits
+  const { error } = await supabase
+    .from('user_credits')
+    .insert({
+      user_id: userId,
+      credits: initialCredits,
+      total_purchased: 0
+    })
+
+  if (error) {
+    console.error('Error initializing user credits:', error)
+    return false
+  }
+
+  console.log(`✅ Initialized ${initialCredits} credits for new user:`, userId)
+  return true
+}
