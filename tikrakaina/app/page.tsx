@@ -1054,9 +1054,15 @@ export default function NotionStyleVersion() {
                             } text-white rounded-lg p-4 flex items-center justify-between`}>
                               <div>
                                 <div className="text-xs opacity-90">
-                                  {result.deal_rating === 'GOOD_DEAL' ? 'Sutaupytumėte' :
-                                   result.deal_rating === 'OVERPRICED' ? 'Permokėtumėte' :
-                                   result.price_difference > 0 ? 'Sutaupytumėte' : 'Permokėtumėte'}
+                                  {inputMethod === 'manual' ? (
+                                    result.deal_rating === 'GOOD_DEAL' ? 'Sutaupote' :
+                                    result.deal_rating === 'OVERPRICED' ? 'Permokate' :
+                                    result.price_difference > 0 ? 'Sutaupote' : 'Permokate'
+                                  ) : (
+                                    result.deal_rating === 'GOOD_DEAL' ? 'Sutaupytumėte' :
+                                    result.deal_rating === 'OVERPRICED' ? 'Permokėtumėte' :
+                                    result.price_difference > 0 ? 'Sutaupytumėte' : 'Permokėtumėte'
+                                  )}
                                 </div>
                                 <div className="text-3xl font-bold">
                                   €{Math.round(Math.abs(result.price_difference * 12)).toLocaleString()}
