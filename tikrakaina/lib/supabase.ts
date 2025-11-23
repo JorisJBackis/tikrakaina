@@ -1,64 +1,44 @@
 'use client'
 
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from './supabase/client'
 
-// Create a single supabase client for interacting with your database
-// You need to add these to your .env.local file:
-// NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-// NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('❌ Supabase environment variables are not set!')
-  console.error('NEXT_PUBLIC_SUPABASE_URL:', supabaseUrl ? 'Set' : 'Missing')
-  console.error('NEXT_PUBLIC_SUPABASE_ANON_KEY:', supabaseAnonKey ? 'Set' : 'Missing')
-}
-
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+// Create client instance
+export const supabase = createClient()
 
 // Helper functions for credits
-export async function getUserCredits(userId: string, retries = 3): Promise<number> {
+export async function getUserCredits(userId: string): Promise<number> {
   if (!userId) {
-    console.error('getUserCredits called with no userId')
+    console.error('getUserCredits: No userId provided')
     return 0
   }
 
-  for (let attempt = 1; attempt <= retries; attempt++) {
-    try {
-      const { data, error } = await supabase
-        .from('user_credits')
-        .select('credits')
-        .eq('user_id', userId)
-        .single()
+  console.log('Fetching credits for user:', userId)
 
-      if (error) {
-        console.error(`Error fetching credits (attempt ${attempt}/${retries}):`, error)
+  try {
+    // Add timeout protection
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Credit fetch timeout')), 5000)
+    )
 
-        // If this is the last attempt, return 0
-        if (attempt === retries) {
-          return 0
-        }
+    const fetchPromise = supabase
+      .from('user_credits')
+      .select('credits')
+      .eq('user_id', userId)
+      .single()
 
-        // Wait before retrying (exponential backoff)
-        await new Promise(resolve => setTimeout(resolve, 500 * attempt))
-        continue
-      }
+    const { data, error } = await Promise.race([fetchPromise, timeoutPromise])
 
-      return data?.credits || 0
-    } catch (err) {
-      console.error(`Exception fetching credits (attempt ${attempt}/${retries}):`, err)
-
-      if (attempt === retries) {
-        return 0
-      }
-
-      await new Promise(resolve => setTimeout(resolve, 500 * attempt))
+    if (error) {
+      console.error('Error fetching credits:', error)
+      return 0
     }
-  }
 
-  return 0
+    console.log('Credits fetched:', data?.credits)
+    return data?.credits || 0
+  } catch (err) {
+    console.error('Credits fetch failed:', err)
+    return 0
+  }
 }
 
 export async function deductCredits(userId: string, creditsToUse: number = 1) {
@@ -234,24 +214,39 @@ export async function getTrainingDataStats() {
 
 // Save newsletter signup
 export async function saveNewsletterSignup(email: string) {
-  const { error } = await supabase
-    .from('newsletter_signups')
-    .insert({
-      email: email.toLowerCase().trim(),
-      source: 'results_page'
-    })
+  try {
+    // Add timeout to prevent hanging
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Request timeout')), 10000)
+    )
 
-  if (error) {
-    // Check if it's a duplicate email error
-    if (error.code === '23505') {
-      return { success: false, error: 'Email already subscribed' }
+    const insertPromise = supabase
+      .from('newsletter_signups')
+      .insert({
+        email: email.toLowerCase().trim(),
+        source: 'results_page'
+      })
+
+    const { error } = await Promise.race([insertPromise, timeoutPromise]) as any
+
+    if (error) {
+      // Check if it's a duplicate email error
+      if (error.code === '23505') {
+        return { success: false, error: 'Email already subscribed' }
+      }
+      console.error('Error saving newsletter signup:', error)
+      return { success: false, error: 'Failed to subscribe' }
     }
-    console.error('Error saving newsletter signup:', error)
+
+    console.log('Newsletter signup saved successfully')
+    return { success: true }
+  } catch (err: any) {
+    console.error('Newsletter signup exception:', err)
+    if (err.message === 'Request timeout') {
+      return { success: false, error: 'Request timeout - please try again' }
+    }
     return { success: false, error: 'Failed to subscribe' }
   }
-
-  console.log('Newsletter signup saved successfully')
-  return { success: true }
 }
 
 // ============================================

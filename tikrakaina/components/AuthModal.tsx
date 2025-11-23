@@ -26,44 +26,39 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
 
     try {
       if (isLogin) {
-        // Login
         const { data, error } = await supabase.auth.signInWithPassword({
           email,
-          password
+          password,
         })
-        
+
         if (error) throw error
-        
-        if (data.user) {
-          onSuccess()
-          onClose()
-        }
+
+        console.log('Login successful:', data.user?.id)
+
+        // Let the onAuthStateChange listener handle the rest
+        onSuccess()
+        onClose()
       } else {
-        // Signup
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
             data: {
-              full_name: fullName
-            }
-          }
+              full_name: fullName,
+            },
+          },
         })
-        
+
         if (error) throw error
-        
-        if (data.user) {
-          // Update profile with full name
-          await supabase
-            .from('profiles')
-            .update({ full_name: fullName })
-            .eq('id', data.user.id)
-          
-          onSuccess()
-          onClose()
-        }
+
+        console.log('Signup successful:', data.user?.id)
+
+        // Let the onAuthStateChange listener handle the rest
+        onSuccess()
+        onClose()
       }
     } catch (error: any) {
+      console.error('Auth error:', error)
       setError(error.message || 'Įvyko klaida. Bandykite dar kartą.')
     } finally {
       setLoading(false)

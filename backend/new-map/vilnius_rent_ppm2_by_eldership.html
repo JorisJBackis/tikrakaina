@@ -69,14 +69,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.5/d3.min.js"></script>
 </head>
 <body>
-    
-    
-<script>
-  var bounds = L.latLngBounds([54.5489058, 25.004535100000002], [54.852320000000006, 25.5014574]);
-  map_141ded64316012b4fb4868a39e7d99f4.setMaxBounds(bounds);
-  map_141ded64316012b4fb4868a39e7d99f4.options.maxBoundsViscosity = 1.0;
-</script>
-    
+
+
             <div class="folium-map" id="map_141ded64316012b4fb4868a39e7d99f4" ></div>
         
 </body>
@@ -97,9 +91,14 @@
                 }
             );
 
-            
+            // Set bounds after map initialization
+            var bounds = L.latLngBounds([54.5489058, 25.004535100000002], [54.852320000000006, 25.5014574]);
+            map_141ded64316012b4fb4868a39e7d99f4.setMaxBounds(bounds);
+            map_141ded64316012b4fb4868a39e7d99f4.options.maxBoundsViscosity = 1.0;
 
-        
+
+
+
     
             var tile_layer_e3f784b9b12241f09b5384d3eb9024e1 = L.tileLayer(
                 "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",
