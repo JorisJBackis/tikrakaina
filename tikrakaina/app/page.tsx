@@ -6,7 +6,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import * as Accordion from '@radix-ui/react-accordion'
 import { LineChart, Line, AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ScatterChart, Scatter } from 'recharts'
 import { Zap, Check, ChevronDown, Bell, Sparkles, Command, FileText, Download, Gauge, LogOut, RefreshCw, Link as LinkIcon, ArrowRight, BadgeAlert, BadgeCheck, Info } from 'lucide-react'
-import { supabase, getUserCredits, deductCredits, savePrediction, saveRentalTrainingData, saveNewsletterSignup, trackEvent } from '@/lib/supabase'
+import { supabase, getUserCredits, deductCredits, savePrediction, saveRentalTrainingData, saveNewsletterSignup, trackEvent, trackAnonymousAnalysis, hasExceededFreeTrial } from '@/lib/supabase'
+import { generateDeviceFingerprint, hasUsedFreeTrial, incrementLocalAnalysisCount, getUserIP } from '@/lib/deviceFingerprint'
 import AuthModal from '@/components/AuthModal'
 import BuyCreditsModal from '@/components/BuyCreditsModal'
 import UserCredits from '@/components/UserCredits'
@@ -57,6 +58,7 @@ export default function NotionStyleVersion() {
   const [user, setUser] = useState<any>(null)
   const [userCredits, setUserCredits] = useState(0)
   const [showAuthModal, setShowAuthModal] = useState(false)
+  const [authModalMode, setAuthModalMode] = useState<'default' | 'freeTrialExhausted'>('default')
   const [showBuyCreditsModal, setShowBuyCreditsModal] = useState(false)
   const [checkingAuth, setCheckingAuth] = useState(true)
 
@@ -337,7 +339,7 @@ export default function NotionStyleVersion() {
 
     if (result.success) {
       setNewsletterStatus('success')
-      setNewsletterMessage('Sėkmingai užsiprenumeravote! 🎉')
+      setNewsletterMessage('Sėkmingai užsiprenumeravote!')
       setNewsletterEmail('')
 
       // 📊 Track newsletter signup
@@ -418,15 +420,32 @@ export default function NotionStyleVersion() {
  const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault();
 
-  // Auth / credits gates - TEMPORARILY DISABLED FOR FREE LAUNCH
-  // if (!user) {
-  //   setShowAuthModal(true);
-  //   return;
-  // }
-  // if (userCredits < 1) {
-  //   setShowBuyCreditsModal(true);
-  //   return;
-  // }
+  // ✅ FREE TRIAL SYSTEM: 1 free analysis, then require signup for 1 more
+  if (!user) {
+    // Anonymous user - check if they've used their free trial
+    const fingerprint = generateDeviceFingerprint()
+    const userIp = await getUserIP() // Get IP address
+    const locallyUsed = hasUsedFreeTrial()
+    const dbUsed = await hasExceededFreeTrial(fingerprint, userIp || undefined)
+
+    if (locallyUsed || dbUsed) {
+      console.log('🚫 Free trial exhausted - showing auth modal')
+      console.log('📍 Blocked - Fingerprint:', fingerprint, 'IP:', userIp)
+      setAuthModalMode('freeTrialExhausted')
+      setShowAuthModal(true)
+      return
+    }
+
+    console.log('✅ Anonymous user can proceed with free trial')
+    console.log('📍 Allowed - Fingerprint:', fingerprint, 'IP:', userIp)
+  } else {
+    // Logged in user - check credits
+    if (userCredits < 1) {
+      console.log('🚫 No credits remaining - showing buy credits modal')
+      setShowBuyCreditsModal(true)
+      return
+    }
+  }
 
   setLoading(true);
   setResult(null);
@@ -457,10 +476,13 @@ export default function NotionStyleVersion() {
   const API_BASE = (process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000").replace(/\/+$/, "");
   const endpoint = inputMethod === "url" ? "/api/predict" : "/api/predict-manual";
 
+  // Normalize mobile URLs to desktop URLs (m.aruodas.lt -> www.aruodas.lt)
+  const normalizedUrl = url.replace(/\/\/m\.aruodas\.lt\//g, '//www.aruodas.lt/');
+
   // Build request body
   const requestBody =
     inputMethod === "url"
-      ? { url }
+      ? { url: normalizedUrl }
       : {
           manual_data: {
             ...processedManualData,
@@ -486,54 +508,63 @@ export default function NotionStyleVersion() {
       throw new Error(data?.error || `Request failed with ${res.status}`);
     }
 
-    // IMPORTANT: Credit deduction and save - TEMPORARILY DISABLED FOR FREE LAUNCH
-    // if (user) {
-    //   console.log('🚨 STARTING CREDIT DEDUCTION FOR USER:', user.id);
+    // ✅ CREDIT/FREE TRIAL TRACKING
+    if (!user) {
+      // Anonymous user - track free trial usage
+      const fingerprint = generateDeviceFingerprint()
+      const userIp = await getUserIP()
 
-    //   // Deduct credits first
-    //   const creditDeducted = await deductCredits(user.id, 1);
+      // Track in localStorage
+      incrementLocalAnalysisCount()
 
-    //   console.log('🚨 CREDIT DEDUCTION RESULT:', creditDeducted);
+      // Track in database with IP
+      await trackAnonymousAnalysis(fingerprint, userIp || undefined)
 
-    //   if (!creditDeducted) {
-    //     console.error('❌ Failed to deduct credits');
-    //     alert('CRITICAL: Credit deduction failed! Check console.');
-    //   } else {
-    //     console.log('✅ Credit successfully deducted');
-    //   }
+      console.log('✅ Tracked anonymous analysis:', { fingerprint, ip: userIp })
+    } else {
+      // Logged in user - deduct credits
+      console.log('🚨 STARTING CREDIT DEDUCTION FOR USER:', user.id)
 
-    //   // Save prediction to history
-    //   await savePrediction(
-    //     user.id,
-    //     inputMethod === "url" ? url : null,
-    //     inputMethod === "manual" ? manualData : null,
-    //     data,
-    //     Boolean(isRenting)
-    //   );
+      const creditDeducted = await deductCredits(user.id, 1)
 
-    //   // If renting & manual, log training data
-    //   if (isRenting === true && inputMethod === "manual") {
-    //     const rentPrice = actualRentPrice ? parseFloat(actualRentPrice) : undefined;
-    //     await saveRentalTrainingData(
-    //       user.id,
-    //       manualData,
-    //       rentPrice,
-    //       url || undefined,
-    //       undefined,
-    //       rentPrice ? `User confirmed rent: €${rentPrice}/month` : "User is renting but did not provide price"
-    //     );
-    //   }
+      if (!creditDeducted) {
+        console.error('❌ Failed to deduct credits')
+        alert('CRITICAL: Credit deduction failed! Check console.')
+      } else {
+        console.log('✅ Credit successfully deducted')
+      }
 
-    //   // Force refresh credits after deduction
-    //   const newCredits = await getUserCredits(user.id);
-    //   console.log('💰 Fetched new credits:', newCredits);
-    //   setUserCredits(newCredits);
+      // Save prediction to history
+      await savePrediction(
+        user.id,
+        inputMethod === "url" ? url : null,
+        inputMethod === "manual" ? manualData : null,
+        data,
+        Boolean(isRenting)
+      )
 
-    //   // Force a small delay to ensure state updates
-    //   await new Promise(resolve => setTimeout(resolve, 100));
+      // If renting & manual, log training data
+      if (isRenting === true && inputMethod === "manual") {
+        const rentPrice = actualRentPrice ? parseFloat(actualRentPrice) : undefined
+        await saveRentalTrainingData(
+          user.id,
+          manualData,
+          rentPrice,
+          url || undefined,
+          rentPrice ? `User confirmed rent: €${rentPrice}/month` : "User is renting but did not provide price"
+        )
+      }
 
-    //   console.log('✅ All async operations complete. Showing results now.');
-    // }
+      // Force refresh credits after deduction
+      const newCredits = await getUserCredits(user.id)
+      console.log('💰 Fetched new credits:', newCredits)
+      setUserCredits(newCredits)
+
+      // Force a small delay to ensure state updates
+      await new Promise(resolve => setTimeout(resolve, 100))
+
+      console.log('✅ All async operations complete. Showing results now.')
+    }
 
     // For manual mode with actual rent price, add comparison fields
     if (inputMethod === 'manual' && actualRentPrice && parseFloat(actualRentPrice) > 0) {
@@ -1441,11 +1472,16 @@ export default function NotionStyleVersion() {
       {/* Authentication Modal */}
       <AuthModal
         isOpen={showAuthModal}
-        onClose={() => setShowAuthModal(false)}
+        onClose={() => {
+          setShowAuthModal(false)
+          setAuthModalMode('default')
+        }}
         onSuccess={() => {
           checkAuth()
           setShowAuthModal(false)
+          setAuthModalMode('default')
         }}
+        mode={authModalMode}
       />
 
       {/* Buy Credits Modal */}
