@@ -1,9 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Mail, Lock, User, CreditCard, Sparkles, Check } from 'lucide-react'
-import { supabase, initializeUserCredits } from '@/lib/supabase'
+import { X, Mail, Lock, CreditCard, Sparkles, Check } from 'lucide-react'
+import { supabase } from '@/lib/supabase'
 
 interface AuthModalProps {
   isOpen: boolean
@@ -16,9 +16,19 @@ export default function AuthModal({ isOpen, onClose, onSuccess, mode = 'default'
   const [isLogin, setIsLogin] = useState(mode === 'freeTrialExhausted' ? false : true)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [fullName, setFullName] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Update isLogin when mode changes
+  useEffect(() => {
+    if (mode === 'freeTrialExhausted') {
+      setIsLogin(false) // Force signup mode
+      console.log('🔵 Free trial exhausted - forcing SIGNUP mode')
+    } else {
+      setIsLogin(true) // Default to login mode
+      console.log('🔵 Default mode - showing LOGIN')
+    }
+  }, [mode, isOpen])
 
   const handleSocialLogin = async (provider: 'google' | 'facebook') => {
     setLoading(true)
@@ -50,38 +60,39 @@ export default function AuthModal({ isOpen, onClose, onSuccess, mode = 'default'
 
     try {
       if (isLogin) {
+        console.log('🔵 LOGIN MODE - Signing in...')
         const { data, error } = await supabase.auth.signInWithPassword({
           email,
           password,
         })
 
-        if (error) throw error
+        if (error) {
+          console.error('❌ Login error:', error)
+          throw error
+        }
 
-        console.log('Login successful:', data.user?.id)
+        console.log('✅ Login successful:', data.user?.id)
 
         // Let the onAuthStateChange listener handle the rest
         onSuccess()
         onClose()
       } else {
+        console.log('🔵 SIGNUP MODE - Creating new user...')
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
-          options: {
-            data: {
-              full_name: fullName,
-            },
-          },
         })
 
-        if (error) throw error
+        if (error) {
+          console.error('❌ Signup error:', error)
+          throw error
+        }
 
         console.log('✅ Signup successful:', data.user?.id)
+        console.log('✅ Credits automatically granted by database trigger (1 credit)')
 
-        // Initialize user with 1 free credit
-        if (data.user?.id) {
-          await initializeUserCredits(data.user.id, 1)
-          console.log('✅ Granted 1 free credit to new user')
-        }
+        // Note: Credits are automatically initialized by the database trigger
+        // No need to call initializeUserCredits() here
 
         // Let the onAuthStateChange listener handle the rest
         onSuccess()
@@ -188,25 +199,6 @@ export default function AuthModal({ isOpen, onClose, onSuccess, mode = 'default'
           */}
 
           <form onSubmit={handleAuth} className="space-y-4">
-            {!isLogin && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Vardas Pavardė
-                </label>
-                <div className="relative">
-                  <User className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
-                  <input
-                    type="text"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                    placeholder="Jonas Jonaitis"
-                    required={!isLogin}
-                  />
-                </div>
-              </div>
-            )}
-
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 El. paštas
