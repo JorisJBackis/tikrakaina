@@ -132,9 +132,11 @@ async def create_checkout(request: CheckoutRequest = CheckoutRequest()):
                     }
                 }
 
-                # Add merchant_code for test mode
+                # Add merchant_code (required for both test and live)
                 if SUMUP_MODE == "test":
                     checkout_data["merchant_code"] = "MKXM19DH"
+                else:
+                    checkout_data["merchant_code"] = "M7CZS725"  # Live merchant code
 
                 response = await client.post(
                     SUMUP_CHECKOUTS_URL,
