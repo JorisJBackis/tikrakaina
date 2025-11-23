@@ -1057,7 +1057,7 @@ export default function NotionStyleVersion() {
                                   {inputMethod === 'manual' ? (
                                     result.deal_rating === 'GOOD_DEAL' ? 'Sutaupote' :
                                     result.deal_rating === 'OVERPRICED' ? 'Permokate' :
-                                    result.price_difference > 0 ? 'Sutaupote' : 'Permokate'
+                                    result.price_difference > 0 ? 'Permokate' : 'Sutaupote'
                                   ) : (
                                     result.deal_rating === 'GOOD_DEAL' ? 'Sutaupytumėte' :
                                     result.deal_rating === 'OVERPRICED' ? 'Permokėtumėte' :
