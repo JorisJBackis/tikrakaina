@@ -18,6 +18,7 @@ from database import (
     get_payment_attempt,
     update_payment_attempt,
     list_payment_attempts,
+    add_credits_to_user,
     PaymentStatus,
     supabase
 )
@@ -79,10 +80,11 @@ from typing import Optional
 
 class CheckoutRequest(BaseModel):
     amountCents: Optional[int] = 100
+    userId: Optional[str] = None
 
 @router.post("/create-checkout")
 async def create_checkout(request: CheckoutRequest = CheckoutRequest()):
-    """Create a new SumUp checkout for test payment."""
+    """Create a new SumUp checkout for payment."""
     try:
         # Generate unique reference
         ref = str(uuid.uuid4())
@@ -93,8 +95,14 @@ async def create_checkout(request: CheckoutRequest = CheckoutRequest()):
         # Calculate credits based on amount
         credits = 1 if amount_cents == 99 else 7 if amount_cents == 499 else 20 if amount_cents == 999 else 1
 
-        # Create payment attempt record
-        attempt = await create_payment_attempt(ref=ref, amount_cents=amount_cents, currency="EUR", credits_purchased=credits)
+        # Create payment attempt record with userId
+        attempt = await create_payment_attempt(
+            ref=ref,
+            amount_cents=amount_cents,
+            currency="EUR",
+            credits_purchased=credits,
+            user_id=request.userId
+        )
         if not attempt:
             raise HTTPException(status_code=500, detail="Failed to create payment attempt")
 
@@ -198,6 +206,7 @@ async def check_payment_status(
             "ref": ref,
             "status": attempt["status"],
             "transactionCode": attempt.get("sumup_transaction_code"),
+            "creditsAdded": attempt.get("credits_purchased") if attempt["status"] == "PAID" else 0,
             "message": "Status from database (webhook updates this)"
         })
 
@@ -264,13 +273,23 @@ async def verify_payment_manually(
                         "sumup_raw": checkout,
                     })
 
+                    # If payment successful, add credits to user account
+                    credits_added = 0
+                    if new_status == PaymentStatus.PAID.value and attempt.get("user_id"):
+                        credits_to_add = attempt.get("credits_purchased", 1)
+                        success = await add_credits_to_user(attempt["user_id"], credits_to_add)
+                        if success:
+                            credits_added = credits_to_add
+                            logger.info(f"[Manual Verify] Added {credits_to_add} credits to user {attempt['user_id']}")
+
                     return JSONResponse({
                         "ref": ref,
                         "status": new_status,
                         "transactionCode": checkout.get("transaction_code"),
                         "sumupStatus": checkout_status,
                         "verified": True,
-                        "method": "checkout_api"
+                        "method": "checkout_api",
+                        "creditsAdded": credits_added
                     })
 
             # FALLBACK METHOD: Query transactions if no checkout_id or checkout lookup failed
@@ -491,7 +510,18 @@ async def sumup_webhook(request: Request):
 
             logger.info(f"Payment {ref} verified and updated to {new_status}")
 
-            return JSONResponse({"status": "ok", "verified_status": new_status})
+            # If payment successful, add credits to user account
+            credits_added = 0
+            if new_status == PaymentStatus.PAID.value and attempt.get("user_id"):
+                credits_to_add = attempt.get("credits_purchased", 1)
+                success = await add_credits_to_user(attempt["user_id"], credits_to_add)
+                if success:
+                    credits_added = credits_to_add
+                    logger.info(f"Added {credits_to_add} credits to user {attempt['user_id']}")
+                else:
+                    logger.error(f"Failed to add credits to user {attempt['user_id']}")
+
+            return JSONResponse({"status": "ok", "verified_status": new_status, "creditsAdded": credits_added})
 
     except Exception as e:
         logger.error(f"Webhook error: {str(e)}")

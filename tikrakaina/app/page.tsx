@@ -619,7 +619,7 @@ export default function NotionStyleVersion() {
           </h1>
           
           <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
-            Profesionali platforma, išanalizavusi virš 40 000 būstų su 97% tikslumu.
+            Profesionali platforma, išanalizavusi virš 40 000 būstų su vos 2% paklaida.
             Sutaupykite tūkstančius eurų priimdami duomenimis pagrįstus sprendimus.
           </p>
 
@@ -639,7 +639,7 @@ export default function NotionStyleVersion() {
           <div className="flex justify-center space-x-8 text-sm text-gray-500">
             <span className="flex items-center"><Check className="h-4 w-4 mr-1 text-green-500" /> Be prisijungimo</span>
             <span className="flex items-center"><Check className="h-4 w-4 mr-1 text-green-500" /> 30 sek analizė</span>
-            <span className="flex items-center"><Check className="h-4 w-4 mr-1 text-green-500" /> 97% tikslumas</span>
+            <span className="flex items-center"><Check className="h-4 w-4 mr-1 text-green-500" /> 2% paklaida</span>
           </div>
         </div>
       </section>
@@ -1191,16 +1191,12 @@ export default function NotionStyleVersion() {
                 <h3 className="text-sm font-semibold mb-4">Statistika</h3>
                 <div className="space-y-3">
                   <div className="flex justify-between">
-                    <span className="text-gray-400 text-sm">Tikslumas</span>
-                    <span className="font-mono">97% vidutinis</span>
+                    <span className="text-gray-400 text-sm">Paklaida</span>
+                    <span className="font-mono">2%</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-400 text-sm">Modelio versija</span>
                     <span className="font-mono">v2.4</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-400 text-sm">Algoritmas</span>
-                    <span className="font-mono">XGBoost + LightGBM</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-400 text-sm">Aprėptis</span>

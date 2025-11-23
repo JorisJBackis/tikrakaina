@@ -12,8 +12,11 @@ import asyncio
 import logging
 from pathlib import Path
 
-# Import our model utilities
+# Import our model utilities (OLD - kept for compatibility)
 from model_utils import scrape_listing, featurise, predict_from_url
+
+# Import A/B testing module (NEW - runs both models)
+from ab_testing import DualModelPredictor, run_dual_prediction, get_ab_test_stats, get_ab_test_history
 
 # Import SumUp routes
 from sumup_routes import router as sumup_router, webhook_router
@@ -38,15 +41,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Load the model once at startup
+# Load the OLD model once at startup (kept for fallback)
 MODEL_PATH = Path("model.pkl")
 try:
     with open(MODEL_PATH, "rb") as f:
         model = pickle.load(f)
-    logger.info("Model loaded successfully")
+    logger.info("✅ Old model loaded successfully")
 except Exception as e:
-    logger.error(f"Failed to load model: {e}")
+    logger.error(f"❌ Failed to load old model: {e}")
     model = None
+
+# Initialize A/B Testing System (loads BOTH models)
+try:
+    dual_predictor = DualModelPredictor()
+    logger.info("🚀 A/B Testing System initialized - Both models loaded!")
+except Exception as e:
+    logger.error(f"❌ Failed to initialize A/B testing system: {e}")
+    dual_predictor = None
 
 # Include routers
 app.include_router(sumup_router)
@@ -70,7 +81,7 @@ class ManualDataRequest(BaseModel):
     heat_Centrinis: bool
     heat_Dujinis: bool
     heat_Elektra: bool
-    age_days: int = 20
+    district: Optional[str] = "Other"  # District for categorical encoding
     is_rental: bool
 
 class ManualPredictionRequest(BaseModel):
@@ -81,6 +92,10 @@ class PredictionResponse(BaseModel):
     price_per_m2: Optional[float] = None
     total_price: Optional[float] = None
     confidence: Optional[float] = None
+    listing_price: Optional[float] = None  # Actual price from aruodas listing
+    price_difference: Optional[float] = None  # Our prediction - listing price
+    price_difference_percent: Optional[float] = None  # Percentage difference
+    deal_rating: Optional[str] = None  # "GOOD_DEAL", "FAIR_PRICE", "OVERPRICED"
     features: Optional[Dict[str, Any]] = None
     analysis: Optional[Dict[str, str]] = None
     error: Optional[str] = None
@@ -143,75 +158,158 @@ async def root():
 async def predict(request: PredictionRequest):
     """
     Predict rental price for a given Aruodas.lt listing
+    🆕 NOW RUNS BOTH OLD AND NEW MODELS FOR A/B TESTING!
+    Returns NEW model prediction to user, logs both for comparison
     """
-    if model is None:
+    if dual_predictor is None and model is None:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Model not loaded"
+            detail="Models not loaded"
         )
-    
+
     url_str = str(request.url)
-    
+
     # Check if URL is from aruodas.lt
     if "aruodas.lt" not in url_str:
         return PredictionResponse(
             success=False,
             error="Please provide a valid aruodas.lt listing URL"
         )
-    
+
     # Check cache
     if url_str in prediction_cache:
         cached_result = prediction_cache[url_str]
         if datetime.now() - cached_result["timestamp"] < timedelta(minutes=5):
-            logger.info(f"Returning cached prediction for {url_str}")
+            logger.info(f"📦 Returning cached prediction for {url_str}")
             return cached_result["response"]
-    
+
     try:
-        # Scrape the listing
-        logger.info(f"Scraping listing: {url_str}")
-        raw_data = scrape_listing(url_str)
-        
-        # Process features
-        logger.info("Processing features")
-        features_df = featurise(raw_data)
-        
-        # Make prediction
-        logger.info("Making prediction")
-        pred_price_pm2 = model.predict(features_df)[0]
-        
-        # Get area for total price calculation
-        area = features_df["area_m2"].iloc[0]
-        total_price = pred_price_pm2 * area if pd.notnull(area) else None
-        
-        # Prepare feature dictionary
-        feature_dict = features_df.iloc[0].to_dict()
-        feature_dict = {k: (v if pd.notnull(v) else None) for k, v in feature_dict.items()}
-        
-        # Generate analysis (simplified for MVP)
-        analysis = generate_analysis(pred_price_pm2, total_price, feature_dict)
-        
-        # Calculate confidence (mock for now)
-        confidence = calculate_confidence(feature_dict)
-        
-        response = PredictionResponse(
-            success=True,
-            price_per_m2=round(pred_price_pm2, 2),
-            total_price=round(total_price, 0) if total_price else None,
-            confidence=confidence,
-            features=feature_dict,
-            analysis=analysis
-        )
-        
-        # Cache the result
-        prediction_cache[url_str] = {
-            "timestamp": datetime.now(),
-            "response": response
-        }
-        
-        return response
-        
+        # 🚀 RUN DUAL PREDICTION (both old and new models)
+        if dual_predictor:
+            logger.info(f"🔬 Running A/B Test: Old Model vs New Model")
+            ab_result = await run_dual_prediction(url_str, dual_predictor, request.user_id)
+
+            # If new model succeeded, use its prediction
+            if ab_result.get("success") and ab_result["new_model"].get("success"):
+                new_model_data = ab_result["new_model"]
+
+                # Generate analysis for the new model prediction
+                analysis = generate_analysis(
+                    new_model_data["price_per_m2"],
+                    new_model_data["total_price"],
+                    new_model_data["features_used"]
+                )
+
+                # Calculate confidence
+                confidence = calculate_confidence(new_model_data["features_used"])
+
+                # Extract listing price and calculate deal rating
+                listing_price = None
+                price_diff = None
+                price_diff_pct = None
+                deal_rating = None
+
+                # Get actual price from ab_result (already extracted in ab_testing.py)
+                if ab_result.get("actual_price") and ab_result["actual_price"].get("actual_price_total"):
+                    listing_price = ab_result["actual_price"]["actual_price_total"]
+                    logger.info(f"💰 Listing price from ab_result: €{listing_price}")
+
+                    if listing_price:
+                        price_diff, price_diff_pct, deal_rating = calculate_deal_rating(
+                            new_model_data["total_price"],
+                            listing_price
+                        )
+                        logger.info(f"📊 Deal rating: {deal_rating} ({price_diff_pct:+.1f}%)")
+
+                response = PredictionResponse(
+                    success=True,
+                    price_per_m2=new_model_data["price_per_m2"],
+                    total_price=new_model_data["total_price"],
+                    confidence=confidence,
+                    listing_price=listing_price,
+                    price_difference=price_diff,
+                    price_difference_percent=price_diff_pct,
+                    deal_rating=deal_rating,
+                    features=new_model_data["features_used"],
+                    analysis=analysis
+                )
+
+                # Cache the result
+                prediction_cache[url_str] = {
+                    "timestamp": datetime.now(),
+                    "response": response
+                }
+
+                logger.info(f"✅ Returned NEW model prediction: €{response.price_per_m2}/m²")
+                logger.info(f"📊 Comparison: {ab_result['comparison'].get('diff_pct_per_m2', 0):+.1f}% difference")
+
+                return response
+
+            # If new model failed but old model succeeded, fall back to old model
+            elif ab_result["old_model"].get("success"):
+                logger.warning("⚠️  New model failed, falling back to old model")
+                old_model_data = ab_result["old_model"]
+
+                analysis = generate_analysis(
+                    old_model_data["price_per_m2"],
+                    old_model_data["total_price"],
+                    old_model_data["features_used"]
+                )
+
+                confidence = calculate_confidence(old_model_data["features_used"])
+
+                response = PredictionResponse(
+                    success=True,
+                    price_per_m2=old_model_data["price_per_m2"],
+                    total_price=old_model_data["total_price"],
+                    confidence=confidence,
+                    features=old_model_data["features_used"],
+                    analysis=analysis
+                )
+
+                return response
+            else:
+                raise Exception("Both models failed")
+
+        # Fallback to old model only (if dual predictor not available)
+        else:
+            logger.warning("⚠️  A/B testing not available, using old model only")
+            logger.info(f"Scraping listing: {url_str}")
+            raw_data = scrape_listing(url_str)
+
+            logger.info("Processing features")
+            features_df = featurise(raw_data)
+
+            logger.info("Making prediction")
+            pred_price_pm2 = model.predict(features_df)[0]
+
+            area = features_df["area_m2"].iloc[0]
+            total_price = pred_price_pm2 * area if pd.notnull(area) else None
+
+            feature_dict = features_df.iloc[0].to_dict()
+            feature_dict = {k: (v if pd.notnull(v) else None) for k, v in feature_dict.items()}
+
+            analysis = generate_analysis(pred_price_pm2, total_price, feature_dict)
+            confidence = calculate_confidence(feature_dict)
+
+            response = PredictionResponse(
+                success=True,
+                price_per_m2=round(pred_price_pm2, 2),
+                total_price=round(total_price, 0) if total_price else None,
+                confidence=confidence,
+                features=feature_dict,
+                analysis=analysis
+            )
+
+            prediction_cache[url_str] = {
+                "timestamp": datetime.now(),
+                "response": response
+            }
+
+            return response
+
     except Exception as e:
-        logger.error(f"Prediction error: {str(e)}")
+        logger.error(f"❌ Prediction error: {str(e)}")
         return PredictionResponse(
             success=False,
             error=f"Failed to process listing: {str(e)}"
@@ -220,64 +318,92 @@ async def predict(request: PredictionRequest):
 @app.post("/api/predict-manual", response_model=PredictionResponse)
 async def predict_manual(request: ManualPredictionRequest):
     """
-    Predict rental price from manually entered property data
+    Predict rental price from manually entered property data.
+    NOW USES THE NEW MODEL (same as URL scraper) for consistency!
     """
-    if model is None:
+    if dual_predictor is None:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Model not loaded"
         )
-    
+
     try:
         data = request.manual_data
-        
-        # Create a DataFrame with the manual data in the format expected by the model
-        features_df = pd.DataFrame([{
-            'rooms': data.rooms,
-            'area_m2': data.area_m2,
-            'floor_current': data.floor_current,
-            'floor_total': data.floor_total,
-            'year_centered': data.year_centered,
-            'dist_to_center_km': data.dist_to_center_km,
-            'has_lift': int(data.has_lift),
-            'has_balcony_terrace': int(data.has_balcony_terrace),
-            'has_parking_spot': int(data.has_parking_spot),
-            'heat_Centrinis': int(data.heat_Centrinis),
-            'heat_Dujinis': int(data.heat_Dujinis),
-            'heat_Elektra': int(data.heat_Elektra),
-            'age_days': data.age_days
-        }])
-        
-        logger.info(f"Making prediction with manual data: {features_df.iloc[0].to_dict()}")
-        
-        # Make prediction
-        pred_price_pm2 = model.predict(features_df)[0]
-        total_price = pred_price_pm2 * data.area_m2
-        
-        # Calculate confidence (mock for now, based on data completeness)
-        confidence = 95.0  # High confidence for complete manual data
-        
-        # Analysis based on the data
-        analysis = {
-            "value_rating": "FAIR" if pred_price_pm2 < 15 else "GOOD" if pred_price_pm2 < 18 else "EXCELLENT",
-            "location_rating": "EXCELLENT" if data.dist_to_center_km < 3 else "GOOD" if data.dist_to_center_km < 7 else "BASIC",
-            "amenities_rating": "EXCELLENT" if (data.has_lift + data.has_balcony_terrace + data.has_parking_spot) >= 2 else "GOOD" if (data.has_lift + data.has_balcony_terrace + data.has_parking_spot) == 1 else "BASIC"
+
+        # Prepare features in the exact format the NEW model expects
+        # Use the same district categories and feature order as the new model
+        from ab_testing import _coerce_dtypes_and_order
+
+        # Build feature dict matching the new model's expected format
+        features_dict = {
+            'rooms': float(data.rooms),
+            'area_m2': float(data.area_m2),
+            'floor_current': float(data.floor_current),
+            'floor_total': float(data.floor_total),
+            'year_centered': float(data.year_centered),
+            'dist_to_center_km': float(data.dist_to_center_km),
+            'has_lift': float(int(data.has_lift)),
+            'has_balcony_terrace': float(int(data.has_balcony_terrace)),
+            'has_parking_spot': float(int(data.has_parking_spot)),
+            'heat_Centrinis': float(int(data.heat_Centrinis)),
+            'heat_Dujinis': float(int(data.heat_Dujinis)),
+            'heat_Elektra': float(int(data.heat_Elektra)),
         }
-        
+
+        # Create DataFrame
+        features_df = pd.DataFrame([features_dict])
+
+        # Handle district encoding - validate against known categories
+        district_val = data.district if data.district else "Other"
+        if district_val not in dual_predictor.district_categories:
+            logger.warning(f"Unknown district '{district_val}', mapping to 'Other'")
+            district_val = "Other"
+
+        features_df["district_encoded"] = pd.Categorical(
+            [district_val],
+            categories=dual_predictor.district_categories
+        )
+
+        # Apply the same dtype coercion and column ordering as URL scraper
+        features_df = _coerce_dtypes_and_order(
+            features_df,
+            dual_predictor.district_categories,
+            dual_predictor.feature_order
+        )
+
+        logger.info(f"Making prediction with manual data (NEW MODEL): {features_dict}")
+        logger.info(f"District: {district_val}")
+
+        # Make prediction using NEW model
+        pred_price_pm2 = dual_predictor.new_model.predict(features_df)[0]
+        total_price = pred_price_pm2 * data.area_m2
+
+        # High confidence for complete manual data
+        confidence = 95.0
+
+        # Generate analysis using the same function as URL scraper
+        analysis = generate_analysis(
+            pred_price_pm2,
+            total_price,
+            features_dict
+        )
+
         result = PredictionResponse(
             success=True,
-            price_per_m2=round(pred_price_pm2, 2),
-            total_price=round(total_price, 2),
+            price_per_m2=round(float(pred_price_pm2), 2),
+            total_price=round(float(total_price), 2),
             confidence=confidence,
-            features=features_df.iloc[0].to_dict(),
+            features={k: (float(v) if isinstance(v, (int, float, np.number)) else str(v))
+                     for k, v in features_df.iloc[0].to_dict().items()},
             analysis=analysis
         )
-        
-        logger.info(f"Manual prediction successful: €{result.price_per_m2}/m² (€{result.total_price} total)")
+
+        logger.info(f"✅ Manual prediction (NEW MODEL): €{result.price_per_m2}/m² (€{result.total_price} total)")
         return result
-        
+
     except Exception as e:
-        logger.error(f"Failed to process manual data: {str(e)}")
+        logger.error(f"❌ Failed to process manual data: {str(e)}")
+        logger.exception(e)  # Log full traceback
         return PredictionResponse(
             success=False,
             error=f"Failed to process manual data: {str(e)}"
@@ -392,18 +518,142 @@ def calculate_confidence(features: dict) -> float:
     Calculate prediction confidence based on feature completeness
     """
     important_features = [
-        'area_m2', 'rooms', 'floor_current', 'floor_total', 
+        'area_m2', 'rooms', 'floor_current', 'floor_total',
         'year_centered', 'dist_to_center_km'
     ]
-    
+
     available = sum(1 for f in important_features if features.get(f) is not None)
     confidence = (available / len(important_features)) * 100
-    
+
     # Adjust based on data quality
     if features.get("age_days") and features["age_days"] > 30:
         confidence *= 0.95  # Slightly lower confidence for older listings
-    
+
     return round(confidence, 1)
+
+def extract_listing_price(scraped_data: dict) -> Optional[float]:
+    """
+    Extract the listing price from scraped aruodas data
+    """
+    # Price is usually in "Kaina" field or similar
+    price_str = scraped_data.get("Kaina", [None])[0] if isinstance(scraped_data.get("Kaina"), list) else scraped_data.get("Kaina")
+
+    if price_str:
+        # Extract number from string like "850 €/mėn." or "850"
+        import re
+        match = re.search(r'(\d+(?:\s*\d+)*)', str(price_str))
+        if match:
+            price = float(match.group(1).replace(' ', ''))
+            return price
+    return None
+
+def calculate_deal_rating(predicted_price: float, listing_price: float) -> tuple:
+    """
+    Calculate deal rating based on price difference
+    Returns: (difference_amount, difference_percent, rating)
+    """
+    difference = predicted_price - listing_price
+    difference_percent = (difference / listing_price * 100) if listing_price > 0 else 0
+
+    # Determine rating
+    if difference_percent > 5:  # Our prediction is 5%+ higher = good deal
+        rating = "GOOD_DEAL"
+    elif difference_percent < -1:  # Our prediction is 1%+ lower = overpriced
+        rating = "OVERPRICED"
+    else:  # Within range = fair price
+        rating = "FAIR_PRICE"
+
+    return round(difference, 2), round(difference_percent, 1), rating
+
+
+# ============================================================================
+# A/B TESTING ANALYSIS ENDPOINTS
+# ============================================================================
+
+@app.get("/api/ab-test/stats")
+async def get_ab_stats():
+    """
+    Get comprehensive A/B testing statistics
+    Shows comparison between old and new models
+    """
+    try:
+        stats = await get_ab_test_stats()
+        return {
+            "success": True,
+            "data": stats
+        }
+    except Exception as e:
+        logger.error(f"Failed to get A/B stats: {e}")
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+
+@app.get("/api/ab-test/history")
+async def get_ab_history(limit: int = 50):
+    """
+    Get recent A/B test history
+    """
+    try:
+        history = await get_ab_test_history(limit)
+        return {
+            "success": True,
+            "count": len(history),
+            "data": history
+        }
+    except Exception as e:
+        logger.error(f"Failed to get A/B history: {e}")
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+
+@app.get("/api/ab-test/summary")
+async def get_ab_summary():
+    """
+    Get quick summary of A/B testing results
+    Perfect for dashboard display
+    """
+    try:
+        stats = await get_ab_test_stats()
+
+        if "error" in stats:
+            return {
+                "success": False,
+                "error": stats["error"]
+            }
+
+        summary = {
+            "total_tests": stats.get("total_tests", 0),
+            "successful_tests": stats.get("successful_tests", 0),
+            "avg_difference_pct": stats.get("avg_diff_pct", 0),
+            "agreement": {
+                "high": stats.get("high_agreement", 0),
+                "medium": stats.get("medium_agreement", 0),
+                "low": stats.get("low_agreement", 0)
+            },
+            "model_comparison": {
+                "old_avg_price_pm2": stats.get("old_model_avg_pm2", 0),
+                "new_avg_price_pm2": stats.get("new_model_avg_pm2", 0),
+                "new_model_higher": stats.get("new_model_higher_count", 0),
+                "old_model_higher": stats.get("new_model_lower_count", 0)
+            }
+        }
+
+        return {
+            "success": True,
+            "data": summary
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to get A/B summary: {e}")
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
 
 if __name__ == "__main__":
     import uvicorn, os

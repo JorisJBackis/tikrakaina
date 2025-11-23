@@ -22,10 +22,15 @@ SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", os.getenv("SUPABASE_ANON_K
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # Database URL for SQLAlchemy (if using direct PostgreSQL connection)
-DATABASE_URL = os.getenv("DATABASE_URL", f"postgresql://postgres.tzftzmqntxnijkfvvtfz:{os.getenv('SUPABASE_DB_PASSWORD', '')}@aws-0-us-west-1.pooler.supabase.com:6543/postgres")
+# Note: psql uses postgres://, but SQLAlchemy needs postgresql://
+DATABASE_URL = os.getenv("DATABASE_URL", f"postgresql://postgres:{os.getenv('SUPABASE_DB_PASSWORD', '')}@db.tzftzmqntxnijkfvvtfz.supabase.co:6543/postgres")
 
-# Create SQLAlchemy engine
-engine = create_engine(DATABASE_URL) if "SUPABASE_DB_PASSWORD" in os.environ else None
+# Create SQLAlchemy engine (convert postgres:// to postgresql:// if needed)
+if "SUPABASE_DB_PASSWORD" in os.environ:
+    db_url = DATABASE_URL.replace("postgres://", "postgresql://")
+    engine = create_engine(db_url)
+else:
+    engine = None
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine) if engine else None
 Base = declarative_base()
 
@@ -72,7 +77,7 @@ if engine:
     Base.metadata.create_all(bind=engine)
 
 # Helper functions for Supabase operations
-async def create_payment_attempt(ref: str, amount_cents: int = 100, currency: str = "EUR", credits_purchased: int = 1):
+async def create_payment_attempt(ref: str, amount_cents: int = 100, currency: str = "EUR", credits_purchased: int = 1, user_id: str = None):
     """Create a new payment attempt in Supabase."""
     data = {
         "ref": ref,
@@ -80,12 +85,46 @@ async def create_payment_attempt(ref: str, amount_cents: int = 100, currency: st
         "currency": currency,
         "status": PaymentStatus.INIT.value,
         "credits_purchased": credits_purchased,
+        "user_id": user_id,
         "created_at": datetime.utcnow().isoformat(),
         "updated_at": datetime.utcnow().isoformat(),
     }
 
     result = supabase.table("payment_attempts").insert(data).execute()
     return result.data[0] if result.data else None
+
+async def add_credits_to_user(user_id: str, credits_to_add: int):
+    """Add credits to a user's account after successful payment."""
+    if not user_id:
+        return False
+
+    try:
+        # Check if user has credits record
+        result = supabase.table("user_credits").select("*").eq("user_id", user_id).execute()
+
+        if result.data and len(result.data) > 0:
+            # Update existing record
+            current_credits = result.data[0].get("credits", 0)
+            total_purchased = result.data[0].get("total_purchased", 0)
+
+            supabase.table("user_credits").update({
+                "credits": current_credits + credits_to_add,
+                "total_purchased": total_purchased + credits_to_add,
+                "updated_at": datetime.utcnow().isoformat()
+            }).eq("user_id", user_id).execute()
+        else:
+            # Create new record
+            supabase.table("user_credits").insert({
+                "user_id": user_id,
+                "credits": credits_to_add,
+                "total_purchased": credits_to_add,
+                "updated_at": datetime.utcnow().isoformat()
+            }).execute()
+
+        return True
+    except Exception as e:
+        print(f"Error adding credits to user {user_id}: {e}")
+        return False
 
 async def get_payment_attempt(ref: str):
     """Get a payment attempt by reference."""
