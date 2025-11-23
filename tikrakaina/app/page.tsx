@@ -1099,7 +1099,9 @@ export default function NotionStyleVersion() {
                               </div>
 
                               <div className="border-2 border-gray-300 rounded-lg p-4 text-center bg-white">
-                                <div className="text-xs font-medium text-gray-600 mb-1">Skelbiama</div>
+                                <div className="text-xs font-medium text-gray-600 mb-1">
+                                  {inputMethod === 'manual' ? 'Dabartinė kaina' : 'Skelbime'}
+                                </div>
                                 <div className="text-2xl font-bold text-gray-900">€{Math.round(result.listing_price)}</div>
                                 <div className="text-xs text-gray-500 mt-1">per mėnesį</div>
                               </div>
