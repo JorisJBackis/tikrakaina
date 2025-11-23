@@ -88,13 +88,14 @@ export default function BuyCreditsModal({ isOpen, onClose, userId }: BuyCreditsM
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.95 }}
-          className="bg-white rounded-2xl max-w-2xl w-full p-6"
-        >
+      <div className="fixed inset-0 bg-black/50 z-50 overflow-y-auto">
+        <div className="min-h-screen px-4 py-8 flex items-center justify-center">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="bg-white rounded-2xl max-w-2xl w-full p-6 my-8"
+          >
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-2xl font-bold text-gray-900">Pirkti analizes</h2>
             <button
@@ -192,7 +193,8 @@ export default function BuyCreditsModal({ isOpen, onClose, userId }: BuyCreditsM
               Saugus mokėjimas per SumUp
             </p>
           </div>
-        </motion.div>
+          </motion.div>
+        </div>
       </div>
     </AnimatePresence>
   )
