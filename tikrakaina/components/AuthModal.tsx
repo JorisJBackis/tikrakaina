@@ -106,11 +106,11 @@ export default function AuthModal({ isOpen, onClose, onSuccess, mode = 'default'
           exit={{ opacity: 0, scale: 0.95 }}
           className="bg-white rounded-2xl max-w-md w-full p-6"
         >
-          {/* Free Trial Exhausted Banner - Minimal */}
+          {/* Free Trial Exhausted Banner - Minimal but noticeable */}
           {mode === 'freeTrialExhausted' && (
-            <div className="mb-6 p-4 bg-gray-50 border-l-4 border-gray-900 rounded-lg">
-              <p className="text-sm text-gray-700">
-                Nemokama analizė panaudota. <span className="font-medium text-gray-900">Registruokitės</span> ir gaukite dar vieną.
+            <div className="mb-6 p-4 bg-blue-50 border-l-4 border-blue-600 rounded-lg">
+              <p className="text-base text-gray-900">
+                Nemokama analizė panaudota. <span className="font-semibold text-blue-600">Registruokitės</span> ir gaukite dar vieną.
               </p>
             </div>
           )}
