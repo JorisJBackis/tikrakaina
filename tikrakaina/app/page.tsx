@@ -392,7 +392,7 @@ export default function NotionStyleVersion() {
   }, user?.id);
 
   // For manual input, calculate year_centered (distance already calculated when address selected)
-  let processedManualData = { ...manualData };
+  const processedManualData = { ...manualData };
   if (inputMethod === "manual") {
     // Calculate year_centered from actual year
     if (manualData.year_built) {
