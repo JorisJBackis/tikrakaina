@@ -94,18 +94,18 @@ export default function UserCredits({ userId, onBuyCredits }: UserCreditsProps) 
   }
 
   return (
-    <div className="flex items-center space-x-4">
-      <div className="flex items-center space-x-2 bg-gray-100 px-3 py-1.5 rounded-lg">
-        <CreditCard className="h-4 w-4 text-gray-600" />
-        <span className="text-sm font-medium text-gray-900">
+    <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5 bg-gray-100 px-2 md:px-3 py-1.5 rounded-lg">
+        <CreditCard className="max-[365px]:hidden h-4 w-4 text-gray-600" />
+        <span className="text-xs md:text-sm font-medium text-gray-900 whitespace-nowrap">
           {loading || credits === null ? '...' : `${credits} ${getCreditText(credits)}`}
         </span>
       </div>
       <button
         onClick={onBuyCredits}
-        className="flex items-center space-x-1 px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700"
+        className="flex items-center gap-1 px-2 md:px-3 py-1.5 bg-blue-600 text-white text-xs md:text-sm rounded-lg hover:bg-blue-700 whitespace-nowrap"
       >
-        <Plus className="h-4 w-4" />
+        <Plus className="h-3 w-3 md:h-4 md:w-4" />
         <span>Pirkti</span>
       </button>
     </div>

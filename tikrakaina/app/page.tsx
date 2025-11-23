@@ -542,6 +542,16 @@ export default function NotionStyleVersion() {
       data.price_difference = difference;
       data.price_difference_percent = parseFloat(differencePercent.toFixed(1));
       data.deal_rating = dealRating;
+
+      // Save to rental training data
+      console.log('💾 Saving rental training data...');
+      await saveRentalTrainingData(
+        user?.id || null,
+        processedManualData,
+        listingPrice,
+        undefined,
+        `Manual entry - Deal rating: ${dealRating}, Difference: ${differencePercent.toFixed(1)}%`
+      );
     }
 
     // Show results ONLY after all async operations are done
@@ -663,8 +673,8 @@ export default function NotionStyleVersion() {
             className="inline-flex items-center px-3 py-1 bg-yellow-50 border border-yellow-200 rounded-full text-yellow-800 text-xs md:text-sm mb-4 md:mb-6"
           >
             <Sparkles className="h-3 w-3 md:h-4 md:w-4 mr-1" />
-            <span className="hidden sm:inline">Išvenk permokėjimo • Sužinok savo būsto tikrą kainą!</span>
-            <span className="sm:hidden">Sužinok tikrą kainą!</span>
+            <span className="hidden md:inline">Išvenk permokėjimo • Sužinok savo būsto tikrą kainą!</span>
+            <span className="md:hidden">Išvenk permokėjimo • Sužinok būsto tikrą kainą!</span>
           </motion.div>
 
           <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-gray-900 mb-3 md:mb-4 px-2">
@@ -672,8 +682,7 @@ export default function NotionStyleVersion() {
           </h1>
 
           <p className="text-base md:text-xl text-gray-600 mb-6 md:mb-8 max-w-2xl mx-auto px-2">
-            Profesionali platforma, išanalizavusi virš 40 000 būstų su vos 2% paklaida.
-            Sutaupykite tūkstančius eurų priimdami duomenimis pagrįstus sprendimus.
+            40 000+ būstų analizė. 2% paklaida. Sutaupyk tūkstančius.
           </p>
 
 <div className="flex justify-center mb-6 md:mb-8 px-4">
@@ -681,7 +690,7 @@ export default function NotionStyleVersion() {
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={() => {
-                document.getElementById('valuation-section')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                document.getElementById('valuation-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
               }}
               className="w-full sm:w-auto px-8 md:px-12 py-3 md:py-4 bg-gray-900 text-white text-base md:text-lg rounded-lg hover:bg-gray-800 font-medium"
             >
@@ -742,10 +751,10 @@ export default function NotionStyleVersion() {
                             }`}
                           >
                             <LinkIcon className="h-6 w-6 md:h-8 md:w-8 text-gray-900 mb-2 md:mb-3" />
-                            <h4 className="font-bold text-gray-900 mb-1 md:mb-2 text-sm md:text-base">Turiu nuorodą</h4>
-                            <p className="text-xs md:text-sm text-gray-600 mb-3 md:mb-4">Skelbimas jau įkeltas aruodas.lt</p>
-                            <div className="flex items-center text-xs md:text-sm font-medium text-gray-900 group-hover:translate-x-1 transition-transform">
-                              Pradėti <ArrowRight className="h-3 w-3 md:h-4 md:w-4 ml-1" />
+                            <h4 className="font-bold text-gray-900 mb-1 md:mb-2 text-base md:text-base">Turiu nuorodą</h4>
+                            <p className="text-sm md:text-sm text-gray-600 mb-3 md:mb-4">Skelbimas jau įkeltas aruodas.lt</p>
+                            <div className="flex items-center text-sm md:text-sm font-medium text-gray-900 group-hover:translate-x-1 transition-transform">
+                              Pradėti <ArrowRight className="h-4 w-4 md:h-4 md:w-4 ml-1" />
                             </div>
                           </button>
 
@@ -758,10 +767,10 @@ export default function NotionStyleVersion() {
                             }`}
                           >
                             <FileText className="h-6 w-6 md:h-8 md:w-8 text-gray-600 mb-2 md:mb-3" />
-                            <h4 className="font-bold text-gray-900 mb-1 md:mb-2 text-sm md:text-base">Įvesiu duomenis pats</h4>
-                            <p className="text-xs md:text-sm text-gray-600 mb-3 md:mb-4">Neturiu aruodas.lt skelbimo</p>
-                            <div className="flex items-center text-xs md:text-sm font-medium text-gray-600 group-hover:text-gray-900 group-hover:translate-x-1 transition-all">
-                              Pradėti <ArrowRight className="h-3 w-3 md:h-4 md:w-4 ml-1" />
+                            <h4 className="font-bold text-gray-900 mb-1 md:mb-2 text-base md:text-base">Įvesiu duomenis pats</h4>
+                            <p className="text-sm md:text-sm text-gray-600 mb-3 md:mb-4">Neturiu aruodas.lt skelbimo</p>
+                            <div className="flex items-center text-sm md:text-sm font-medium text-gray-600 group-hover:text-gray-900 group-hover:translate-x-1 transition-all">
+                              Pradėti <ArrowRight className="h-4 w-4 md:h-4 md:w-4 ml-1" />
                             </div>
                           </button>
                         </div>
@@ -1177,9 +1186,9 @@ export default function NotionStyleVersion() {
                         <div className="flex items-start space-x-2 md:space-x-3">
                           <Bell className="h-4 w-4 md:h-5 md:w-5 text-blue-600 mt-0.5 flex-shrink-0" />
                           <div className="flex-1 min-w-0">
-                            <h4 className="font-medium text-gray-900 text-sm md:text-base">Geriausių pasiūlymų pranešimai</h4>
-                            <p className="text-xs md:text-sm text-gray-600 mt-1">
-                              Automatiškai skanuojame naujausius skelbimus su geriausiais kainų pasiūlymais.
+                            <h4 className="font-medium text-gray-900 text-base md:text-base">Geriausių pasiūlymų pranešimai</h4>
+                            <p className="text-sm md:text-sm text-gray-600 mt-1">
+                              Automatiškai skenuojame naujausius skelbimus su geriausiais kainų pasiūlymais.
                               Nedelsdami jus informuosime. Tai vidutiniškai sutaupo mūsų naudotojams 1050 eurų per metus!
                             </p>
                             <div className="mt-2 md:mt-3 space-y-2">
@@ -1240,8 +1249,8 @@ export default function NotionStyleVersion() {
               </div>
             </div>
 
-            {/* Sidebar */}
-            <div className="space-y-4 md:space-y-6 order-2">
+            {/* Sidebar - Stats hidden on mobile */}
+            <div className="hidden lg:block space-y-4 md:space-y-6 order-2">
               {/* Neighborhood Prices Map */}
               <div className="bg-white rounded-xl border border-gray-200 p-4 md:p-6">
                 <h3 className="text-xs md:text-sm font-semibold text-gray-900 mb-3 md:mb-4">Rajonų vidutinės kainos (50m² naujos statybos buto) </h3>
@@ -1270,6 +1279,19 @@ export default function NotionStyleVersion() {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Neighborhood Map - Mobile Only (above pricing) */}
+      <section className="lg:hidden py-8 px-4 bg-white">
+        <div className="max-w-4xl mx-auto">
+          <div className="bg-white rounded-xl border border-gray-200 p-4">
+            <h3 className="text-sm font-semibold text-gray-900 mb-3 text-center">Rajonų vidutinės kainos (50m² naujos statybos buto)</h3>
+            <VilniusMap />
+            <p className="text-xs text-gray-500 mt-2 text-center">
+              Užveskite pelytę ant rajono žemėlapyje, kad matytumėte kainas
+            </p>
           </div>
         </div>
       </section>
@@ -1345,7 +1367,7 @@ export default function NotionStyleVersion() {
       {/* FAQ Section */}
       <section id="faq" className="py-12 md:py-16 px-4 bg-gray-50">
         <div className="max-w-3xl mx-auto">
-          <h2 className="text-2xl md:text-3xl font-bold text-center text-gray-900 mb-6 md:mb-8">DUK</h2>
+          <h2 className="text-3xl md:text-3xl font-bold text-center text-gray-900 mb-6 md:mb-8">DUK</h2>
           
           <Accordion.Root type="single" collapsible className="space-y-2">
             {[
@@ -1383,7 +1405,7 @@ export default function NotionStyleVersion() {
                   <span className="text-left font-medium text-gray-900 text-sm md:text-base pr-2">{item.q}</span>
                   <ChevronDown className="h-4 w-4 text-gray-500 flex-shrink-0" />
                 </Accordion.Trigger>
-                <Accordion.Content className="px-4 md:px-6 pb-3 md:pb-4 text-gray-600 text-xs md:text-sm">
+                <Accordion.Content className="px-4 md:px-6 pb-3 md:pb-4 text-gray-600 text-sm md:text-base">
                   {item.a}
                 </Accordion.Content>
               </Accordion.Item>

@@ -153,13 +153,12 @@ export async function savePrediction(
   return true
 }
 
-// Save rental training data when users say they're renting
+// Save rental training data when users enter manual data with price
 export async function saveRentalTrainingData(
   userId: string | null,
   manualData: any,
   actualRentPrice?: number,
   url?: string,
-  district?: string,
   notes?: string
 ) {
   const trainingData = {
@@ -178,23 +177,24 @@ export async function saveRentalTrainingData(
     heat_elektra: manualData.heat_Elektra,
     actual_rent_price: actualRentPrice,
     listing_url: url,
-    district: district || manualData.district,
+    district: manualData.district,
+    address: manualData.address, // Include address field
     notes: notes,
-    is_verified: true, // True because user confirmed they're renting
-    confidence_level: 100,
-    source: 'user_renting'
+    is_verified: actualRentPrice ? true : false, // Verified if user provided price
+    confidence_level: actualRentPrice ? 100 : 50,
+    source: actualRentPrice ? 'user_with_price' : 'user_no_price'
   }
-  
+
   const { data, error } = await supabase
     .from('rental_training_data')
     .insert(trainingData)
     .select()
-  
+
   if (error) {
     console.error('Error saving rental training data:', error)
     return null
   }
-  
+
   console.log('Rental training data saved:', data)
   return data
 }

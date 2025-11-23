@@ -105,12 +105,12 @@ export default function BuyCreditsModal({ isOpen, onClose, userId }: BuyCreditsM
             </button>
           </div>
 
-          <div className="grid grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
             {creditPackages.map((pkg) => (
               <div
                 key={pkg.id}
                 onClick={() => setSelectedPackage(pkg)}
-                className={`relative cursor-pointer rounded-xl border-2 p-4 transition-all ${
+                className={`relative cursor-pointer rounded-xl border-2 p-6 transition-all ${
                   selectedPackage.id === pkg.id
                     ? 'border-gray-900 bg-gray-50'
                     : 'border-gray-200 hover:border-gray-300'
@@ -125,20 +125,20 @@ export default function BuyCreditsModal({ isOpen, onClose, userId }: BuyCreditsM
                 )}
 
                 <div className="text-center">
-                  <div className="text-3xl font-bold text-gray-900 mb-1">
+                  <div className="text-4xl font-bold text-gray-900 mb-2">
                     {pkg.credits}
                   </div>
-                  <div className="text-sm text-gray-500 mb-3">{getAnalizeWord(pkg.credits)}</div>
+                  <div className="text-base text-gray-500 mb-4">{getAnalizeWord(pkg.credits)}</div>
 
-                  <div className="text-2xl font-bold text-gray-900">
+                  <div className="text-3xl font-bold text-gray-900 mb-1">
                     {pkg.priceDisplay}
                   </div>
-                  <div className="text-xs text-gray-500">
+                  <div className="text-sm text-gray-500 mb-3">
                     €{pkg.pricePerCredit.toFixed(2)}/analizė
                   </div>
 
                   {pkg.savings && (
-                    <div className="mt-2 text-xs font-medium text-green-600">
+                    <div className="text-sm font-medium text-green-600">
                       Sutaupote {pkg.savings}
                     </div>
                   )}
