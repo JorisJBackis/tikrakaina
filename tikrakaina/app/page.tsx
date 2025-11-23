@@ -494,21 +494,25 @@ export default function NotionStyleVersion() {
     if (inputMethod === 'manual' && actualRentPrice && parseFloat(actualRentPrice) > 0) {
       const listingPrice = parseFloat(actualRentPrice);
       const predictedPrice = data.total_price;
-      const priceDiff = listingPrice - predictedPrice;
-      const priceDiffPercent = ((priceDiff / predictedPrice) * 100).toFixed(1);
 
-      // Determine deal rating (same logic as backend)
+      // Match backend logic EXACTLY:
+      // difference = predicted_price - listing_price
+      // difference_percent = (difference / listing_price * 100)
+      const difference = predictedPrice - listingPrice;
+      const differencePercent = listingPrice > 0 ? (difference / listingPrice * 100) : 0;
+
+      // Determine deal rating (EXACT backend logic)
       let dealRating = 'FAIR_PRICE';
-      if (priceDiff < -50) {
+      if (differencePercent > 5) {  // Our prediction is 5%+ higher = good deal
         dealRating = 'GOOD_DEAL';
-      } else if (priceDiff > 50) {
+      } else if (differencePercent < -1) {  // Our prediction is 1%+ lower = overpriced
         dealRating = 'OVERPRICED';
       }
 
       // Add comparison fields to data
       data.listing_price = listingPrice;
-      data.price_difference = priceDiff;
-      data.price_difference_percent = parseFloat(priceDiffPercent);
+      data.price_difference = difference;
+      data.price_difference_percent = parseFloat(differencePercent.toFixed(1));
       data.deal_rating = dealRating;
     }
 
