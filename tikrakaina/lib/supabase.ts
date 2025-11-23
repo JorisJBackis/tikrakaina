@@ -1,3 +1,5 @@
+'use client'
+
 import { createClient } from '@supabase/supabase-js'
 
 // Create a single supabase client for interacting with your database
@@ -221,11 +223,112 @@ export async function saveRentalTrainingData(
 export async function getTrainingDataStats() {
   const { data, error } = await supabase
     .rpc('get_training_data_stats')
-  
+
   if (error) {
     console.error('Error fetching training stats:', error)
     return null
   }
-  
+
   return data?.[0] || null
+}
+
+// Save newsletter signup
+export async function saveNewsletterSignup(email: string) {
+  const { error } = await supabase
+    .from('newsletter_signups')
+    .insert({
+      email: email.toLowerCase().trim(),
+      source: 'results_page'
+    })
+
+  if (error) {
+    // Check if it's a duplicate email error
+    if (error.code === '23505') {
+      return { success: false, error: 'Email already subscribed' }
+    }
+    console.error('Error saving newsletter signup:', error)
+    return { success: false, error: 'Failed to subscribe' }
+  }
+
+  console.log('Newsletter signup saved successfully')
+  return { success: true }
+}
+
+// ============================================
+// ANALYTICS EVENT TRACKING
+// ============================================
+
+// Generate or retrieve session ID
+function getSessionId(): string {
+  if (typeof window === 'undefined') return 'server'
+
+  const storageKey = 'analytics_session_id'
+  let sessionId = sessionStorage.getItem(storageKey)
+
+  if (!sessionId) {
+    sessionId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    sessionStorage.setItem(storageKey, sessionId)
+  }
+
+  return sessionId
+}
+
+// Track custom analytics event
+export async function trackEvent(
+  eventName: string,
+  eventData?: Record<string, any>,
+  userId?: string | null
+) {
+  // Don't track events server-side
+  if (typeof window === 'undefined') return
+
+  const sessionId = getSessionId()
+  const userAgent = navigator.userAgent
+  const pageUrl = window.location.href
+
+  const event = {
+    event_name: eventName,
+    user_id: userId || null,
+    session_id: sessionId,
+    event_data: eventData || {},
+    user_agent: userAgent,
+    page_url: pageUrl
+  }
+
+  // Fire and forget - don't await
+  supabase
+    .from('analytics_events')
+    .insert(event)
+    .then(({ error }) => {
+      if (error) {
+        console.error('Analytics tracking error:', error)
+      } else {
+        console.log('📊 Event tracked:', eventName, eventData)
+      }
+    })
+}
+
+// Get analytics stats (admin only)
+export async function getAnalyticsStats(startDate?: string, endDate?: string) {
+  const query = supabase
+    .from('analytics_events')
+    .select('event_name, created_at, user_id, event_data')
+    .order('created_at', { ascending: false })
+
+  if (startDate) {
+    query.gte('created_at', startDate)
+  }
+
+  if (endDate) {
+    query.lte('created_at', endDate)
+  }
+
+  const { data, error } = await query
+
+  if (error) {
+    console.error('Error fetching analytics:', error)
+    return null
+  }
+
+  return data
 }

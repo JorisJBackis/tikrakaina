@@ -1,0 +1,579 @@
+{
+  "model_districts": [
+    "Antakalnis",
+    "Bajorai",
+    "Baltupiai",
+    "Fabijoniškės",
+    "Jeruzalė",
+    "Justiniškės",
+    "Karoliniškės",
+    "Lazdynai",
+    "Lazdynėliai",
+    "Markučiai",
+    "Naujamiestis",
+    "Naujininkai",
+    "Naujoji Vilnia",
+    "Paupys",
+    "Pašilaičiai",
+    "Pilaitė",
+    "Santariškės",
+    "Senamiestis",
+    "Užupis",
+    "Vilkpėdė",
+    "Viršuliškės",
+    "Šeškinė",
+    "Šiaurės miestelis",
+    "Šnipiškės",
+    "Žirmūnai",
+    "Žvėrynas"
+  ],
+  "mappings": [
+    {
+      "osm_name": "Antakalnis",
+      "model_district": "Antakalnis",
+      "confidence": "exact",
+      "type": "model_district",
+      "notes": "Direct model district"
+    },
+    {
+      "osm_name": "Bajorai",
+      "model_district": "Bajorai",
+      "confidence": "exact",
+      "type": "model_district",
+      "notes": "Direct model district"
+    },
+    {
+      "osm_name": "Baltupiai",
+      "model_district": "Baltupiai",
+      "confidence": "exact",
+      "type": "model_district",
+      "notes": "Direct model district"
+    },
+    {
+      "osm_name": "Fabijoniškės",
+      "model_district": "Fabijoniškės",
+      "confidence": "exact",
+      "type": "model_district",
+      "notes": "Direct model district"
+    },
+    {
+      "osm_name": "Jeruzalė",
+      "model_district": "Jeruzalė",
+      "confidence": "exact",
+      "type": "model_district",
+      "notes": "Direct model district"
+    },
+    {
+      "osm_name": "Justiniškės",
+      "model_district": "Justiniškės",
+      "confidence": "exact",
+      "type": "model_district",
+      "notes": "Direct model district"
+    },
+    {
+      "osm_name": "Karoliniškės",
+      "model_district": "Karoliniškės",
+      "confidence": "exact",
+      "type": "model_district",
+      "notes": "Direct model district"
+    },
+    {
+      "osm_name": "Lazdynai",
+      "model_district": "Lazdynai",
+      "confidence": "exact",
+      "type": "model_district",
+      "notes": "Direct model district"
+    },
+    {
+      "osm_name": "Lazdynėliai",
+      "model_district": "Lazdynėliai",
+      "confidence": "exact",
+      "type": "model_district",
+      "notes": "Direct model district"
+    },
+    {
+      "osm_name": "Markučiai",
+      "model_district": "Markučiai",
+      "confidence": "exact",
+      "type": "model_district",
+      "notes": "Direct model district"
+    },
+    {
+      "osm_name": "Naujamiestis",
+      "model_district": "Naujamiestis",
+      "confidence": "exact",
+      "type": "model_district",
+      "notes": "Direct model district"
+    },
+    {
+      "osm_name": "Naujininkai",
+      "model_district": "Naujininkai",
+      "confidence": "exact",
+      "type": "model_district",
+      "notes": "Direct model district"
+    },
+    {
+      "osm_name": "Naujoji Vilnia",
+      "model_district": "Naujoji Vilnia",
+      "confidence": "exact",
+      "type": "model_district",
+      "notes": "Direct model district"
+    },
+    {
+      "osm_name": "Paupys",
+      "model_district": "Paupys",
+      "confidence": "exact",
+      "type": "model_district",
+      "notes": "Direct model district"
+    },
+    {
+      "osm_name": "Pašilaičiai",
+      "model_district": "Pašilaičiai",
+      "confidence": "exact",
+      "type": "model_district",
+      "notes": "Direct model district"
+    },
+    {
+      "osm_name": "Pilaitė",
+      "model_district": "Pilaitė",
+      "confidence": "exact",
+      "type": "model_district",
+      "notes": "Direct model district"
+    },
+    {
+      "osm_name": "Santariškės",
+      "model_district": "Santariškės",
+      "confidence": "exact",
+      "type": "model_district",
+      "notes": "Direct model district"
+    },
+    {
+      "osm_name": "Senamiestis",
+      "model_district": "Senamiestis",
+      "confidence": "exact",
+      "type": "model_district",
+      "notes": "Direct model district"
+    },
+    {
+      "osm_name": "Užupis",
+      "model_district": "Užupis",
+      "confidence": "exact",
+      "type": "model_district",
+      "notes": "Direct model district"
+    },
+    {
+      "osm_name": "Vilkpėdė",
+      "model_district": "Vilkpėdė",
+      "confidence": "exact",
+      "type": "model_district",
+      "notes": "Direct model district"
+    },
+    {
+      "osm_name": "Viršuliškės",
+      "model_district": "Viršuliškės",
+      "confidence": "exact",
+      "type": "model_district",
+      "notes": "Direct model district"
+    },
+    {
+      "osm_name": "Šeškinė",
+      "model_district": "Šeškinė",
+      "confidence": "exact",
+      "type": "model_district",
+      "notes": "Direct model district"
+    },
+    {
+      "osm_name": "Šiaurės miestelis",
+      "model_district": "Šiaurės miestelis",
+      "confidence": "exact",
+      "type": "model_district",
+      "notes": "Direct model district"
+    },
+    {
+      "osm_name": "Šnipiškės",
+      "model_district": "Šnipiškės",
+      "confidence": "exact",
+      "type": "model_district",
+      "notes": "Direct model district"
+    },
+    {
+      "osm_name": "Žirmūnai",
+      "model_district": "Žirmūnai",
+      "confidence": "exact",
+      "type": "model_district",
+      "notes": "Direct model district"
+    },
+    {
+      "osm_name": "Žvėrynas",
+      "model_district": "Žvėrynas",
+      "confidence": "exact",
+      "type": "model_district",
+      "notes": "Direct model district"
+    },
+    {
+      "osm_name": "Antakalnio seniūnija",
+      "model_district": "Antakalnis",
+      "confidence": "high",
+      "type": "seniunija",
+      "notes": "Direct match"
+    },
+    {
+      "osm_name": "Lazdynų seniūnija",
+      "model_district": "Lazdynai",
+      "confidence": "high",
+      "type": "seniunija",
+      "notes": "Direct match"
+    },
+    {
+      "osm_name": "Naujamiesčio seniūnija",
+      "model_district": "Naujamiestis",
+      "confidence": "high",
+      "type": "seniunija",
+      "notes": "Direct match"
+    },
+    {
+      "osm_name": "Naujininkų seniūnija",
+      "model_district": "Naujininkai",
+      "confidence": "high",
+      "type": "seniunija",
+      "notes": "Direct match"
+    },
+    {
+      "osm_name": "Naujosios Vilnios seniūnija",
+      "model_district": "Naujoji Vilnia",
+      "confidence": "high",
+      "type": "seniunija",
+      "notes": "Direct match"
+    },
+    {
+      "osm_name": "Pilaitės seniūnija",
+      "model_district": "Pilaitė",
+      "confidence": "high",
+      "type": "seniunija",
+      "notes": "Direct match"
+    },
+    {
+      "osm_name": "Senamiesčio seniūnija",
+      "model_district": "Senamiestis",
+      "confidence": "high",
+      "type": "seniunija",
+      "notes": "Direct match"
+    },
+    {
+      "osm_name": "Vilkpėdės seniūnija",
+      "model_district": "Vilkpėdė",
+      "confidence": "high",
+      "type": "seniunija",
+      "notes": "Direct match"
+    },
+    {
+      "osm_name": "Šeškinės seniūnija",
+      "model_district": "Šeškinė",
+      "confidence": "high",
+      "type": "seniunija",
+      "notes": "Direct match"
+    },
+    {
+      "osm_name": "Fabijoniškių seniūnija",
+      "model_district": "Fabijoniškės",
+      "confidence": "high",
+      "type": "seniunija",
+      "notes": "Name similarity"
+    },
+    {
+      "osm_name": "Justiniškių seniūnija",
+      "model_district": "Justiniškės",
+      "confidence": "high",
+      "type": "seniunija",
+      "notes": "Name similarity"
+    },
+    {
+      "osm_name": "Karoliniškių seniūnija",
+      "model_district": "Karoliniškės",
+      "confidence": "high",
+      "type": "seniunija",
+      "notes": "Name similarity"
+    },
+    {
+      "osm_name": "Pašilaičių seniūnija",
+      "model_district": "Pašilaičiai",
+      "confidence": "high",
+      "type": "seniunija",
+      "notes": "Name similarity"
+    },
+    {
+      "osm_name": "Viršuliškių seniūnija",
+      "model_district": "Viršuliškės",
+      "confidence": "high",
+      "type": "seniunija",
+      "notes": "Name similarity"
+    },
+    {
+      "osm_name": "Šnipiškių seniūnija",
+      "model_district": "Šnipiškės",
+      "confidence": "high",
+      "type": "seniunija",
+      "notes": "Name similarity"
+    },
+    {
+      "osm_name": "Žirmūnų seniūnija",
+      "model_district": "Žirmūnai",
+      "confidence": "high",
+      "type": "seniunija",
+      "notes": "Name similarity"
+    },
+    {
+      "osm_name": "Žvėryno seniūnija",
+      "model_district": "Žvėrynas",
+      "confidence": "high",
+      "type": "seniunija",
+      "notes": "Name similarity"
+    },
+    {
+      "osm_name": "Rasų seniūnija",
+      "model_district": "Markučiai",
+      "confidence": "medium",
+      "type": "seniunija",
+      "notes": "Contains Markučiai, Užupis, Senamiestis - using primary"
+    },
+    {
+      "osm_name": "Rasos",
+      "model_district": "Markučiai",
+      "confidence": "medium",
+      "type": "seniunija",
+      "notes": "Variation of Rasų seniūnija"
+    },
+    {
+      "osm_name": "Verkių seniūnija",
+      "model_district": "Baltupiai",
+      "confidence": "medium",
+      "type": "seniunija",
+      "notes": "Contains Baltupiai, Jeruzalė, Antakalnis - using primary"
+    },
+    {
+      "osm_name": "Grigiškių seniūnija",
+      "model_district": null,
+      "confidence": "low",
+      "type": "seniunija",
+      "notes": "Outside main Vilnius - peripheral area"
+    },
+    {
+      "osm_name": "Panerių seniūnija",
+      "model_district": null,
+      "confidence": "low",
+      "type": "seniunija",
+      "notes": "Outside main Vilnius - peripheral area"
+    },
+    {
+      "osm_name": "Lukiškės",
+      "model_district": "Naujamiestis",
+      "confidence": "medium",
+      "type": "quarter",
+      "notes": "Quarter in Naujamiestis area"
+    },
+    {
+      "osm_name": "Naujakiemis",
+      "model_district": "Naujamiestis",
+      "confidence": "medium",
+      "type": "quarter",
+      "notes": "Part of Naujamiestis"
+    },
+    {
+      "osm_name": "Valakampiai",
+      "model_district": "Antakalnis",
+      "confidence": "medium",
+      "type": "quarter",
+      "notes": "Neighborhood in Antakalnis"
+    },
+    {
+      "osm_name": "Sapieginė",
+      "model_district": "Antakalnis",
+      "confidence": "medium",
+      "type": "quarter",
+      "notes": "Part of Antakalnis"
+    },
+    {
+      "osm_name": "Saulėtekis",
+      "model_district": "Antakalnis",
+      "confidence": "medium",
+      "type": "quarter",
+      "notes": "Part of Antakalnis"
+    },
+    {
+      "osm_name": "Turniškės",
+      "model_district": "Antakalnis",
+      "confidence": "medium",
+      "type": "quarter",
+      "notes": "Part of Antakalnis"
+    },
+    {
+      "osm_name": "Visoriai",
+      "model_district": "Baltupiai",
+      "confidence": "medium",
+      "type": "quarter",
+      "notes": "Tested: Baltupio g. 5 returns this"
+    },
+    {
+      "osm_name": "Balsiai",
+      "model_district": "Baltupiai",
+      "confidence": "medium",
+      "type": "quarter",
+      "notes": "Near Baltupiai"
+    },
+    {
+      "osm_name": "Bernardinai",
+      "model_district": "Senamiestis",
+      "confidence": "medium",
+      "type": "quarter",
+      "notes": "Part of old town"
+    },
+    {
+      "osm_name": "Kalnų parkas",
+      "model_district": "Senamiestis",
+      "confidence": "medium",
+      "type": "quarter",
+      "notes": "Park area in old town"
+    },
+    {
+      "osm_name": "Šiaurės miestelis",
+      "model_district": "Šiaurės miestelis",
+      "confidence": "exact",
+      "type": "quarter",
+      "notes": "Is its own model district"
+    },
+    {
+      "osm_name": "Bajorai",
+      "model_district": "Bajorai",
+      "confidence": "exact",
+      "type": "quarter",
+      "notes": "Is its own model district"
+    },
+    {
+      "osm_name": "Perkūnkiemis",
+      "model_district": "Šeškinė",
+      "confidence": "medium",
+      "type": "quarter",
+      "notes": "Part of Šeškinė"
+    },
+    {
+      "osm_name": "Lazdynėliai",
+      "model_district": "Lazdynėliai",
+      "confidence": "exact",
+      "type": "quarter",
+      "notes": "Is its own model district, near Lazdynai"
+    },
+    {
+      "osm_name": "Pavilionys",
+      "model_district": "Naujoji Vilnia",
+      "confidence": "medium",
+      "type": "quarter",
+      "notes": "Part of Naujoji Vilnia"
+    },
+    {
+      "osm_name": "Santariškės",
+      "model_district": "Santariškės",
+      "confidence": "exact",
+      "type": "quarter",
+      "notes": "Is its own model district"
+    },
+    {
+      "osm_name": "Paupys",
+      "model_district": "Paupys",
+      "confidence": "exact",
+      "type": "quarter",
+      "notes": "Is its own model district"
+    },
+    {
+      "osm_name": "Senoji Pilaitė",
+      "model_district": "Pilaitė",
+      "confidence": "medium",
+      "type": "neighborhood",
+      "notes": "Old Pilaitė neighborhood"
+    },
+    {
+      "osm_name": "Šiaurinė Pilaitė",
+      "model_district": "Pilaitė",
+      "confidence": "medium",
+      "type": "neighborhood",
+      "notes": "Northern Pilaitė"
+    },
+    {
+      "osm_name": "Verkiai",
+      "model_district": "Baltupiai",
+      "confidence": "medium",
+      "type": "neighborhood",
+      "notes": "Part of Verkių seniūnija"
+    },
+    {
+      "osm_name": "Naujieji Verkiai",
+      "model_district": "Baltupiai",
+      "confidence": "medium",
+      "type": "neighborhood",
+      "notes": "New Verkiai area"
+    },
+    {
+      "osm_name": "Salininkai",
+      "model_district": "Justiniškės",
+      "confidence": "medium",
+      "type": "neighborhood",
+      "notes": "Near Justiniškės"
+    },
+    {
+      "osm_name": "Pūčkoriai",
+      "model_district": "Fabijoniškės",
+      "confidence": "medium",
+      "type": "neighborhood",
+      "notes": "Near Fabijoniškės"
+    },
+    {
+      "osm_name": "Šnipiškės",
+      "model_district": "Šnipiškės",
+      "confidence": "exact",
+      "type": "neighborhood",
+      "notes": "Is model district"
+    },
+    {
+      "osm_name": "Vingis",
+      "model_district": "Žvėrynas",
+      "confidence": "medium",
+      "type": "neighborhood",
+      "notes": "Park in Žvėrynas"
+    },
+    {
+      "osm_name": "Kairėnai",
+      "model_district": "Pašilaičiai",
+      "confidence": "medium",
+      "type": "neighborhood",
+      "notes": "Near Pašilaičiai"
+    },
+    {
+      "osm_name": "Markučiai",
+      "model_district": "Markučiai",
+      "confidence": "exact",
+      "type": "neighborhood",
+      "notes": "Model district"
+    },
+    {
+      "osm_name": "Užupis",
+      "model_district": "Užupis",
+      "confidence": "exact",
+      "type": "neighborhood",
+      "notes": "Model district"
+    }
+  ],
+  "stats": {
+    "total": 76,
+    "by_confidence": {
+      "exact": 34,
+      "high": 17,
+      "medium": 23,
+      "low": 2
+    },
+    "by_type": {
+      "model_district": 26,
+      "seniunija": 22,
+      "quarter": 17,
+      "neighborhood": 11
+    }
+  }
+}

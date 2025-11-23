@@ -1,15 +1,17 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import * as Accordion from '@radix-ui/react-accordion'
 import { LineChart, Line, AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ScatterChart, Scatter } from 'recharts'
-import { Zap, Check, ChevronDown, Bell, ArrowRight, Sparkles, Hash, Filter, Search, Command, FileText, Download, CreditCard, Gauge, LogOut } from 'lucide-react'
-import { supabase, getUserCredits, deductCredits, savePrediction, saveRentalTrainingData } from '@/lib/supabase'
+import { Zap, Check, ChevronDown, Bell, Sparkles, Search, Command, FileText, Download, Gauge, LogOut, RefreshCw, Link as LinkIcon, ArrowRight, BadgeAlert, BadgeCheck, Info } from 'lucide-react'
+import { supabase, getUserCredits, deductCredits, savePrediction, saveRentalTrainingData, saveNewsletterSignup, trackEvent } from '@/lib/supabase'
 import AuthModal from '@/components/AuthModal'
 import BuyCreditsModal from '@/components/BuyCreditsModal'
 import UserCredits from '@/components/UserCredits'
 import Footer from '@/components/Footer'
+import VilniusMap from '@/components/VilniusMap'
+import { extractDistrictWithOverrides, type DistrictExtractionResult } from '@/lib/districtExtractor'
 
 // Merged Version 4: Notion-Style Clean (Lithuanian)
 export default function NotionStyleVersion() {
@@ -18,15 +20,18 @@ export default function NotionStyleVersion() {
   const [result, setResult] = useState<any>(null)
   const [loadingProgress, setLoadingProgress] = useState(0)
   const [selectedPlan, setSelectedPlan] = useState('starter')
-  const [isRenting, setIsRenting] = useState<boolean | null>(null)
+  const [isRenting, setIsRenting] = useState<boolean | null>(false)
   const [inputMethod, setInputMethod] = useState<'url' | 'manual'>('url')
   const [manualData, setManualData] = useState({
     rooms: '',
     area_m2: '',
     floor_current: '',
     floor_total: '',
-    year_centered: '',
-    dist_to_center_km: '',
+    year_built: '', // Store actual year (e.g., 2010)
+    address: '', // Store address for geocoding
+    district: '', // Store district for model prediction
+    year_centered: '', // Calculated: year_built - 2000
+    dist_to_center_km: '', // Calculated from address
     has_lift: false,
     has_balcony_terrace: false,
     has_parking_spot: false,
@@ -34,7 +39,16 @@ export default function NotionStyleVersion() {
     heat_Dujinis: false,
     heat_Elektra: false
   })
+  const [addressSuggestions, setAddressSuggestions] = useState<any[]>([])
+  const [showAddressSuggestions, setShowAddressSuggestions] = useState(false)
+  const [selectedAddressData, setSelectedAddressData] = useState<any>(null)
+  const [addressSearchLoading, setAddressSearchLoading] = useState(false)
+  const [districtExtraction, setDistrictExtraction] = useState<DistrictExtractionResult | null>(null)
   const [actualRentPrice, setActualRentPrice] = useState('')
+  const [newsletterEmail, setNewsletterEmail] = useState('')
+  const [newsletterStatus, setNewsletterStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
+  const [newsletterMessage, setNewsletterMessage] = useState('')
+  const [urlInputHighlight, setUrlInputHighlight] = useState(false)
 
   // Authentication states
   const [user, setUser] = useState<any>(null)
@@ -43,12 +57,160 @@ export default function NotionStyleVersion() {
   const [showBuyCreditsModal, setShowBuyCreditsModal] = useState(false)
   const [checkingAuth, setCheckingAuth] = useState(true)
 
-  // Scatter plot data for price vs size
-  const scatterData = Array.from({ length: 50 }, (_, i) => ({
-    x: 30 + Math.random() * 100,
-    y: 400 + Math.random() * 800,
-    z: Math.random() * 5
-  }))
+  // Ref for URL input
+  const urlInputRef = React.useRef<HTMLInputElement>(null)
+
+  // Vilnius city center coordinates (same as backend)
+  const CITY_CENTER = { lat: 54.6872, lon: 25.2797 }
+
+  // Calculate distance between two coordinates using Haversine formula
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+    const R = 6371 // Earth's radius in km
+    const dLat = (lat2 - lat1) * Math.PI / 180
+    const dLon = (lon2 - lon1) * Math.PI / 180
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2)
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+    return R * c
+  }
+
+  // Debounce timer ref
+  const searchTimeoutRef = React.useRef<NodeJS.Timeout | null>(null)
+
+  // Search for address suggestions using Nominatim (with debounce)
+  const searchAddresses = (query: string) => {
+    // Clear previous timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current)
+    }
+
+    if (query.length < 3) {
+      setAddressSuggestions([])
+      setShowAddressSuggestions(false)
+      setAddressSearchLoading(false)
+      return
+    }
+
+    setAddressSearchLoading(true)
+
+    // Debounce: wait 500ms after user stops typing
+    searchTimeoutRef.current = setTimeout(async () => {
+      console.log('🔍 Searching for:', query)
+
+      try {
+        // Use our Next.js API route to avoid CORS issues
+        const url = `/api/geocode?q=${encodeURIComponent(query)}`
+
+        console.log('📡 API URL:', url)
+
+        const response = await fetch(url)
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`)
+        }
+
+        const data = await response.json()
+        console.log('✅ Got results:', data.length, 'addresses')
+        console.log('First result:', data[0])
+
+        setAddressSuggestions(data)
+        setShowAddressSuggestions(data.length > 0)
+        setAddressSearchLoading(false)
+      } catch (error) {
+        console.error('❌ Address search error:', error)
+        setAddressSuggestions([])
+        setShowAddressSuggestions(false)
+        setAddressSearchLoading(false)
+      }
+    }, 500)
+  }
+
+  // District mapping: OSM names → Model districts
+  const districtMapping: Record<string, string> = {
+    "Antakalnis": "Antakalnis", "Antakalnio seniūnija": "Antakalnis",
+    "Bajorai": "Bajorai", "Baltupiai": "Baltupiai",
+    "Fabijoniškės": "Fabijoniškės", "Fabijoniškių seniūnija": "Fabijoniškės",
+    "Jeruzalė": "Jeruzalė",
+    "Justiniškės": "Justiniškės", "Justiniškių seniūnija": "Justiniškės",
+    "Karoliniškės": "Karoliniškės", "Karoliniškių seniūnija": "Karoliniškės",
+    "Lazdynai": "Lazdynai", "Lazdynų seniūnija": "Lazdynai",
+    "Lazdynėliai": "Lazdynėliai", "Markučiai": "Markučiai",
+    "Naujamiestis": "Naujamiestis", "Naujamiesčio seniūnija": "Naujamiestis",
+    "Naujininkai": "Naujininkai", "Naujininkų seniūnija": "Naujininkai",
+    "Naujoji Vilnia": "Naujoji Vilnia", "Naujosios Vilnios seniūnija": "Naujoji Vilnia",
+    "Paupys": "Paupys",
+    "Pašilaičiai": "Pašilaičiai", "Pašilaičių seniūnija": "Pašilaičiai",
+    "Pilaitė": "Pilaitė", "Pilaitės seniūnija": "Pilaitė",
+    "Rasų seniūnija": "Markučiai",
+    "Santariškės": "Santariškės",
+    "Senamiestis": "Senamiestis", "Senamiesčio seniūnija": "Senamiestis",
+    "Užupis": "Užupis", "Verkių seniūnija": "Baltupiai",
+    "Vilkpėdė": "Vilkpėdė", "Vilkpėdės seniūnija": "Vilkpėdė",
+    "Viršuliškės": "Viršuliškės", "Viršuliškių seniūnija": "Viršuliškės",
+    "Šeškinė": "Šeškinė", "Šeškinės seniūnija": "Šeškinė",
+    "Šiaurės miestelis": "Šiaurės miestelis",
+    "Šnipiškės": "Šnipiškės", "Šnipiškių seniūnija": "Šnipiškės",
+    "Žirmūnai": "Žirmūnai", "Žirmūnų seniūnija": "Žirmūnai",
+    "Žvėrynas": "Žvėrynas", "Žvėryno seniūnija": "Žvėrynas"
+  }
+
+  // Handle address selection from suggestions
+  const selectAddress = (suggestion: any) => {
+    const address = suggestion.display_name
+    const lat = parseFloat(suggestion.lat)
+    const lon = parseFloat(suggestion.lon)
+
+    // 🎯 Use smart district extraction with 76-entry mapping table!
+    const extraction = extractDistrictWithOverrides(suggestion.address)
+
+    console.log('🏘️ District Extraction:', extraction)
+
+    // Calculate distance
+    const distance = calculateDistance(lat, lon, CITY_CENTER.lat, CITY_CENTER.lon)
+
+    // Update manual data
+    setManualData({
+      ...manualData,
+      address: address,
+      district: extraction.district,
+      dist_to_center_km: String(distance.toFixed(2))
+    })
+
+    // Store extraction result for UI display
+    setDistrictExtraction(extraction)
+
+    // Store FULL Nominatim response for debugging
+    setSelectedAddressData({
+      lat,
+      lon,
+      district: extraction.district,
+      fullAddress: address,
+      nominatimResponse: suggestion  // Store complete Nominatim response
+    })
+
+    setShowAddressSuggestions(false)
+    setAddressSuggestions([])
+  }
+
+  // Scatter plot data for price vs size - realistic Vilnius rental data with outliers
+  const scatterData = [
+    { x: 25, y: 482 }, { x: 27, y: 450 }, { x: 29, y: 559 }, { x: 31, y: 501 },
+    { x: 33, y: 465 }, { x: 35, y: 380 }, { x: 36, y: 621 }, { x: 38, y: 523 },
+    { x: 40, y: 588 }, { x: 41, y: 649 }, { x: 43, y: 551 }, { x: 45, y: 648 },
+    { x: 47, y: 612 }, { x: 48, y: 820 }, { x: 50, y: 740 }, { x: 52, y: 703 },
+    { x: 54, y: 711 }, { x: 55, y: 788 }, { x: 57, y: 715 }, { x: 59, y: 829 },
+    { x: 61, y: 774 }, { x: 62, y: 761 }, { x: 63, y: 520 }, { x: 64, y: 801 },
+    { x: 66, y: 881 }, { x: 68, y: 833 }, { x: 70, y: 850 }, { x: 71, y: 944 },
+    { x: 73, y: 845 }, { x: 75, y: 911 }, { x: 76, y: 1100 }, { x: 77, y: 930 },
+    { x: 79, y: 904 }, { x: 81, y: 997 }, { x: 83, y: 1017 }, { x: 84, y: 932 },
+    { x: 86, y: 948 }, { x: 88, y: 1010 }, { x: 89, y: 750 }, { x: 90, y: 1002 },
+    { x: 91, y: 1088 }, { x: 93, y: 1045 }, { x: 95, y: 1101 }, { x: 97, y: 1029 },
+    { x: 98, y: 1148 }, { x: 100, y: 1021 }, { x: 101, y: 1150 }, { x: 102, y: 1125 },
+    { x: 103, y: 1059 }, { x: 104, y: 1131 }, { x: 106, y: 1083 }, { x: 107, y: 1119 },
+    { x: 108, y: 1141 }, { x: 109, y: 1150 }, { x: 110, y: 1129 }
+  ]
 
   // Check authentication on mount
   useEffect(() => {
@@ -114,87 +276,136 @@ export default function NotionStyleVersion() {
     }
   }
 
+  const handleNewsletterSignup = async () => {
+    // Validate email
+    if (!newsletterEmail || !newsletterEmail.includes('@')) {
+      setNewsletterStatus('error')
+      setNewsletterMessage('Prašome įvesti teisingą el. pašto adresą')
+      return
+    }
+
+    setNewsletterStatus('loading')
+    setNewsletterMessage('')
+
+    const result = await saveNewsletterSignup(newsletterEmail)
+
+    if (result.success) {
+      setNewsletterStatus('success')
+      setNewsletterMessage('Sėkmingai užsiprenumeravote! 🎉')
+      setNewsletterEmail('')
+
+      // 📊 Track newsletter signup
+      trackEvent('newsletter_signup', {
+        source: 'results_page'
+      }, user?.id)
+    } else {
+      setNewsletterStatus('error')
+      if (result.error === 'Email already subscribed') {
+        setNewsletterMessage('Šis el. paštas jau užsiprenumeruotas')
+      } else {
+        setNewsletterMessage('Klaida. Bandykite dar kartą.')
+      }
+    }
+
+    // Reset status after 3 seconds
+    setTimeout(() => {
+      setNewsletterStatus('idle')
+      setNewsletterMessage('')
+    }, 3000)
+  }
+
   const marketTrends = [
-    { data: 'Sausis', naujienos: 3200, nuoma: 680, pardavimas: 890 },
-    { data: 'Vasaris', naujienos: 3450, nuoma: 695, pardavimas: 920 },
-    { data: 'Kovas', naujienos: 3680, nuoma: 710, pardavimas: 980 },
-    { data: 'Balandis', naujienos: 3890, nuoma: 728, pardavimas: 1050 },
-    { data: 'Gegužė', naujienos: 4100, nuoma: 745, pardavimas: 1120 },
-    { data: 'Birželis', naujienos: 4250, nuoma: 762, pardavimas: 1180 }
+    { data: 'Birželis', naujienos: 4100, nuoma: 980, pardavimas: 820 },
+    { data: 'Liepa', naujienos: 3600, nuoma: 1050, pardavimas: 650 },
+    { data: 'Rugpjūtis', naujienos: 3850, nuoma: 1180, pardavimas: 690 },
+    { data: 'Rugsėjis', naujienos: 4500, nuoma: 1240, pardavimas: 880 },
+    { data: 'Spalis', naujienos: 4350, nuoma: 1080, pardavimas: 920 },
+    { data: 'Lapkritis', naujienos: 3700, nuoma: 950, pardavimas: 750 }
+  ]
+
+  const neighborhoodPrices = [
+    { name: 'Senamiestis', avgPrice: 850, pricePerM2: 14.2, color: '#ef4444' },
+    { name: 'Naujamiestis', avgPrice: 780, pricePerM2: 13.5, color: '#f97316' },
+    { name: 'Žvėrynas', avgPrice: 920, pricePerM2: 15.8, color: '#dc2626' },
+    { name: 'Antakalnis', avgPrice: 650, pricePerM2: 11.2, color: '#eab308' },
+    { name: 'Šnipiškės', avgPrice: 720, pricePerM2: 12.8, color: '#f59e0b' },
+    { name: 'Fabijoniškės', avgPrice: 480, pricePerM2: 8.9, color: '#84cc16' },
+    { name: 'Justiniškės', avgPrice: 520, pricePerM2: 9.4, color: '#22c55e' },
+    { name: 'Pašilaičiai', avgPrice: 510, pricePerM2: 9.1, color: '#22c55e' },
+    { name: 'Lazdynai', avgPrice: 580, pricePerM2: 10.3, color: '#84cc16' },
+    { name: 'Pilaitė', avgPrice: 490, pricePerM2: 8.7, color: '#22c55e' }
   ]
 
   const plans = [
     {
       id: 'starter',
-      name: 'Pradžia',
-      price: '€5',
-      period: '/mėn',
-      credits: '12 vertinimų',
-      features: [
-        'Momentiniai vertinimai',
-        'Bazinė rinkos analizė',
-        'El. pašto palaikymas',
-        '30 dienų istorija'
-      ]
+      name: '1 analizė',
+      price: '€0.99',
+      period: '',
+      credits: '1 analizė',
+      pricePerAnalysis: '€0.99 / analizė',
+      features: []
     },
     {
       id: 'pro',
-      name: 'Profesionalus',
-      price: '€19',
-      period: '/mėn',
-      credits: '100 vertinimų',
-      features: [
-        'PDF ataskaitos',
-        'Investicijų pranešimai',
-        'API prieiga',
-        'Prioritetinis palaikymas',
-        'Excel eksportas'
-      ],
+      name: '7 analizės',
+      price: '€4.99',
+      period: '',
+      credits: '7 analizės',
+      pricePerAnalysis: '€0.71 / analizė',
+      savings: 'Sutaupote 28%',
+      features: [],
       popular: true
     },
     {
       id: 'enterprise',
-      name: 'Verslas',
-      price: '€99',
-      period: '/mėn',
-      credits: 'Neriboti',
-      features: [
-        'Neriboti vertinimai',
-        'Pritaikytos ataskaitos',
-        'Dedikuotas vadybininkas',
-        'Bulk analizė',
-        'White label sprendimas'
-      ]
+      name: '20 analizių',
+      price: '€9.99',
+      period: '',
+      credits: '20 analizių',
+      pricePerAnalysis: '€0.50 / analizė',
+      savings: 'Sutaupote 50% ',
+      features: []
     }
   ]
 
  const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault();
 
-  // Auth / credits gates
-  if (!user) {
-    setShowAuthModal(true);
-    return;
-  }
-  if (userCredits < 1) {
-    setShowBuyCreditsModal(true);
-    return;
-  }
+  // Auth / credits gates - TEMPORARILY DISABLED FOR FREE LAUNCH
+  // if (!user) {
+  //   setShowAuthModal(true);
+  //   return;
+  // }
+  // if (userCredits < 1) {
+  //   setShowBuyCreditsModal(true);
+  //   return;
+  // }
 
   setLoading(true);
   setResult(null);
-  setLoadingProgress(0);
 
-  // Progress bar animation over 30 seconds
-  const progressInterval = setInterval(() => {
-    setLoadingProgress(prev => {
-      if (prev >= 100) {
-        clearInterval(progressInterval);
-        return 100;
-      }
-      return prev + (100 / 30); // Increment to reach 100% in 30 seconds
-    });
-  }, 1000);
+  // 📊 Track analysis start
+  trackEvent('analysis_started', {
+    input_method: inputMethod,
+    is_renting: isRenting
+  }, user?.id);
+
+  // For manual input, calculate year_centered (distance already calculated when address selected)
+  let processedManualData = { ...manualData };
+  if (inputMethod === "manual") {
+    // Calculate year_centered from actual year
+    if (manualData.year_built) {
+      processedManualData.year_centered = String(parseInt(manualData.year_built) - 2000);
+    }
+
+    // Check that address was selected and distance calculated
+    if (!manualData.dist_to_center_km) {
+      alert('Prašome pasirinkti adresą iš pasiūlymų sąrašo.');
+      setLoading(false);
+      return;
+    }
+  }
 
   // Build API base + endpoint safely (client-side env must be NEXT_PUBLIC_*)
   const API_BASE = (process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000").replace(/\/+$/, "");
@@ -206,8 +417,7 @@ export default function NotionStyleVersion() {
       ? { url }
       : {
           manual_data: {
-            ...manualData,
-            age_days: 20,
+            ...processedManualData,
             is_rental: isRenting
           }
         };
@@ -227,69 +437,75 @@ export default function NotionStyleVersion() {
     const data = await res.json();
 
     if (!res.ok || !data?.success) {
-      throw new Error(data?.message || `Request failed with ${res.status}`);
+      throw new Error(data?.error || `Request failed with ${res.status}`);
     }
 
-    // IMPORTANT: Deduct credits and save BEFORE showing results
-    if (user) {
-      console.log('🚨 STARTING CREDIT DEDUCTION FOR USER:', user.id);
+    // IMPORTANT: Credit deduction and save - TEMPORARILY DISABLED FOR FREE LAUNCH
+    // if (user) {
+    //   console.log('🚨 STARTING CREDIT DEDUCTION FOR USER:', user.id);
 
-      // Deduct credits first
-      const creditDeducted = await deductCredits(user.id, 1);
+    //   // Deduct credits first
+    //   const creditDeducted = await deductCredits(user.id, 1);
 
-      console.log('🚨 CREDIT DEDUCTION RESULT:', creditDeducted);
+    //   console.log('🚨 CREDIT DEDUCTION RESULT:', creditDeducted);
 
-      if (!creditDeducted) {
-        console.error('❌ Failed to deduct credits');
-        alert('CRITICAL: Credit deduction failed! Check console.');
-      } else {
-        console.log('✅ Credit successfully deducted');
-      }
+    //   if (!creditDeducted) {
+    //     console.error('❌ Failed to deduct credits');
+    //     alert('CRITICAL: Credit deduction failed! Check console.');
+    //   } else {
+    //     console.log('✅ Credit successfully deducted');
+    //   }
 
-      // Save prediction to history
-      await savePrediction(
-        user.id,
-        inputMethod === "url" ? url : null,
-        inputMethod === "manual" ? manualData : null,
-        data,
-        Boolean(isRenting)
-      );
+    //   // Save prediction to history
+    //   await savePrediction(
+    //     user.id,
+    //     inputMethod === "url" ? url : null,
+    //     inputMethod === "manual" ? manualData : null,
+    //     data,
+    //     Boolean(isRenting)
+    //   );
 
-      // If renting & manual, log training data
-      if (isRenting === true && inputMethod === "manual") {
-        const rentPrice = actualRentPrice ? parseFloat(actualRentPrice) : undefined;
-        await saveRentalTrainingData(
-          user.id,
-          manualData,
-          rentPrice,
-          url || undefined,
-          undefined,
-          rentPrice ? `User confirmed rent: €${rentPrice}/month` : "User is renting but did not provide price"
-        );
-      }
+    //   // If renting & manual, log training data
+    //   if (isRenting === true && inputMethod === "manual") {
+    //     const rentPrice = actualRentPrice ? parseFloat(actualRentPrice) : undefined;
+    //     await saveRentalTrainingData(
+    //       user.id,
+    //       manualData,
+    //       rentPrice,
+    //       url || undefined,
+    //       undefined,
+    //       rentPrice ? `User confirmed rent: €${rentPrice}/month` : "User is renting but did not provide price"
+    //     );
+    //   }
 
-      // Force refresh credits after deduction
-      const newCredits = await getUserCredits(user.id);
-      console.log('💰 Fetched new credits:', newCredits);
-      setUserCredits(newCredits);
+    //   // Force refresh credits after deduction
+    //   const newCredits = await getUserCredits(user.id);
+    //   console.log('💰 Fetched new credits:', newCredits);
+    //   setUserCredits(newCredits);
 
-      // Force a small delay to ensure state updates
-      await new Promise(resolve => setTimeout(resolve, 100));
+    //   // Force a small delay to ensure state updates
+    //   await new Promise(resolve => setTimeout(resolve, 100));
 
-      console.log('✅ All async operations complete. Showing results now.');
-    }
+    //   console.log('✅ All async operations complete. Showing results now.');
+    // }
 
     // Show results ONLY after all async operations are done
     setResult(data);
+
+    // 📊 Track analysis completion
+    trackEvent('analysis_completed', {
+      input_method: inputMethod,
+      price: data.total_price,
+      price_per_m2: data.price_per_m2,
+      confidence: data.confidence
+    }, user?.id);
 
   } catch (err) {
     console.error(err);
     alert("Analizė nepavyko. Bandykite dar kartą.");
   } finally {
-    clearInterval(progressInterval);
     clearTimeout(timeoutId);
     setLoading(false);
-    setLoadingProgress(100);
   }
 };
 
@@ -300,14 +516,29 @@ export default function NotionStyleVersion() {
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-6">
-              <div className="flex items-center space-x-2.5">
+              <a
+                href="https://vilrent.lt"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center space-x-2.5 cursor-pointer hover:opacity-80 transition-opacity"
+              >
                 <img src="/logo.png" alt="VilRent Logo" className="h-10 w-auto object-contain" />
                 <span className="text-2xl font-bold tracking-tight bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 bg-clip-text text-transparent" style={{ fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", letterSpacing: '-0.02em' }}>VilRent</span>
                 <span className="text-xs bg-gray-100 px-2 py-1 rounded-md text-gray-600 font-medium">8 metų patirtis</span>
-              </div>
+              </a>
               <nav className="hidden md:flex items-center space-x-1">
-                <button className="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-md">Kainos</button>
-                <button className="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-md">DUK</button>
+                <button
+                  onClick={() => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' })}
+                  className="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-md"
+                >
+                  Kainos
+                </button>
+                <button
+                  onClick={() => document.getElementById('faq')?.scrollIntoView({ behavior: 'smooth' })}
+                  className="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-md"
+                >
+                  DUK
+                </button>
                 <div className="flex items-center space-x-5 ml-4 pl-4 border-l border-gray-200">
                   <div className="flex items-center space-x-1.5 text-sm text-gray-600">
                     <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
@@ -371,41 +602,16 @@ export default function NotionStyleVersion() {
         </div>
       </header>
 
-      {/* SumUp Verification Banner - PROMINENT FOR REVIEWERS */}
-      <div className="bg-gradient-to-r from-green-500 to-emerald-600 py-4 px-4">
-        <div className="max-w-7xl mx-auto">
-          <a
-            href="/sumup-test"
-            className="flex items-center justify-center space-x-4 text-white hover:opacity-90 transition-opacity"
-          >
-            <div className="flex items-center space-x-3">
-              <div className="p-2 bg-white/20 rounded-lg">
-                <CreditCard className="h-8 w-8" />
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold uppercase tracking-wider">
-                   SUMUP VERIFICATION GATEWAY
-                </div>
-                <div className="text-sm opacity-90 mt-1">
-                  Click here to test payment integration • For SumUp Review Team
-                </div>
-              </div>
-            </div>
-            <ArrowRight className="h-6 w-6 animate-pulse" />
-          </a>
-        </div>
-      </div>
-
       {/* Hero Section */}
       <section className="py-20 px-4">
         <div className="max-w-4xl mx-auto text-center">
-          <motion.div
+<motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             className="inline-flex items-center px-3 py-1 bg-yellow-50 border border-yellow-200 rounded-full text-yellow-800 text-sm mb-6"
           >
             <Sparkles className="h-4 w-4 mr-1" />
-            Sukurta Oksfordo universiteto statistikos specialistų
+            Išvenk permokėjimo • Sužinok savo būsto tikrą kainą!
           </motion.div>
           
           <h1 className="text-5xl font-bold text-gray-900 mb-4">
@@ -413,33 +619,33 @@ export default function NotionStyleVersion() {
           </h1>
           
           <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
-            Profesionali platforma, išanalizavusi virš 40 000 būstų su 98.2% tikslumu.
+            Profesionali platforma, išanalizavusi virš 40 000 būstų su 97% tikslumu.
             Sutaupykite tūkstančius eurų priimdami duomenimis pagrįstus sprendimus.
           </p>
 
-          <div className="flex justify-center space-x-4 mb-8">
-            <motion.button 
+<div className="flex justify-center mb-8">
+            <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              className="px-6 py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800"
+              onClick={() => {
+                document.getElementById('valuation-section')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+              }}
+              className="px-12 py-4 bg-gray-900 text-white text-lg rounded-lg hover:bg-gray-800 font-medium"
             >
               Pradėti nemokamai
             </motion.button>
-            <button className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
-              Žiūrėti demo
-            </button>
           </div>
 
           <div className="flex justify-center space-x-8 text-sm text-gray-500">
-            <span className="flex items-center"><Check className="h-4 w-4 mr-1 text-green-500" /> Nereikia kortelės</span>
+            <span className="flex items-center"><Check className="h-4 w-4 mr-1 text-green-500" /> Be prisijungimo</span>
             <span className="flex items-center"><Check className="h-4 w-4 mr-1 text-green-500" /> 30 sek analizė</span>
-            <span className="flex items-center"><Check className="h-4 w-4 mr-1 text-green-500" /> 98.2% tikslumas</span>
+            <span className="flex items-center"><Check className="h-4 w-4 mr-1 text-green-500" /> 97% tikslumas</span>
           </div>
         </div>
       </section>
 
       {/* Main Valuation Section */}
-      <section className="py-12 bg-gray-50">
+      <section id="valuation-section" className="py-12 bg-gray-50">
         <div className="max-w-6xl mx-auto px-4">
           <div className="grid grid-cols-3 gap-8">
             {/* Valuation Tool */}
@@ -447,75 +653,92 @@ export default function NotionStyleVersion() {
               <div className="bg-white rounded-xl border border-gray-200 p-8">
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-2xl font-bold">Įvertinkite būstą</h2>
-                  <div className="flex items-center space-x-2">
-                    <span className="text-sm text-gray-500">Palaikomas:</span>
-                    <span className="text-sm font-medium bg-gray-100 px-2 py-1 rounded">aruodas.lt</span>
-                  </div>
+                  {result && (
+                    <button
+                      onClick={() => {setResult(null); setUrl('')}}
+                      className="flex items-center space-x-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
+                      title="Naujas vertinimas"
+                    >
+                      <RefreshCw className="h-4 w-4" />
+
+                    </button>
+                  )}
                 </div>
 
                 {!loading && !result && (
                   <div className="space-y-6">
-                    {/* Rental Status Question */}
-                    {isRenting === null && (
-                      <div className="text-center py-8">
-                        <h3 className="text-lg font-semibold mb-4">Ar šiuo metu nuomojate būstą?</h3>
-                        <div className="flex justify-center space-x-4">
-                          <button
-                            onClick={() => {setIsRenting(true); setInputMethod('manual')}}
-                            className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium"
-                          >
-                            Taip, nuomoju
-                          </button>
-                          <button
-                            onClick={() => {setIsRenting(false); setInputMethod('url')}}
-                            className="px-6 py-3 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 font-medium"
-                          >
-                            Ne, nenuomoju
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
                     {/* Input Method Selection */}
-                    {isRenting !== null && (
-                      <div>
-                        <div className="flex justify-center space-x-4 mb-6">
+                    <div>
+                        <h3 className="text-xl font-bold mb-6 text-center">Kaip norite pradėti?</h3>
+
+                        <div className="grid grid-cols-2 gap-4 mb-6">
                           <button
-                            onClick={() => setInputMethod('url')}
-                            className={`px-4 py-2 rounded-lg font-medium ${
-                              inputMethod === 'url' 
-                                ? 'bg-gray-900 text-white' 
-                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                            onClick={() => {
+                              setInputMethod('url')
+                              // Trigger animation and focus
+                              setTimeout(() => {
+                                urlInputRef.current?.focus()
+                                setUrlInputHighlight(true)
+                                setTimeout(() => setUrlInputHighlight(false), 1500)
+                              }, 100)
+                            }}
+                            className={`border-2 rounded-xl p-6 transition-all text-left group ${
+                              inputMethod === 'url'
+                                ? 'border-gray-900 bg-gray-50'
+                                : 'border-gray-300 hover:border-gray-900 hover:bg-gray-50'
                             }`}
                           >
-                            Aruodas.lt nuoroda
+                            <LinkIcon className="h-8 w-8 text-gray-900 mb-3" />
+                            <h4 className="font-bold text-gray-900 mb-2">Turiu nuorodą</h4>
+                            <p className="text-sm text-gray-600 mb-4">Skelbimas jau įkeltas aruodas.lt</p>
+                            <div className="flex items-center text-sm font-medium text-gray-900 group-hover:translate-x-1 transition-transform">
+                              Pradėti <ArrowRight className="h-4 w-4 ml-1" />
+                            </div>
                           </button>
+
                           <button
                             onClick={() => setInputMethod('manual')}
-                            className={`px-4 py-2 rounded-lg font-medium ${
-                              inputMethod === 'manual' 
-                                ? 'bg-gray-900 text-white' 
-                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                            className={`border-2 rounded-xl p-6 transition-all text-left group ${
+                              inputMethod === 'manual'
+                                ? 'border-gray-900 bg-gray-50'
+                                : 'border-gray-300 hover:border-gray-900 hover:bg-gray-50'
                             }`}
                           >
-                            Įvesti duomenis
+                            <FileText className="h-8 w-8 text-gray-600 mb-3" />
+                            <h4 className="font-bold text-gray-900 mb-2">Įvesiu duomenis pats</h4>
+                            <p className="text-sm text-gray-600 mb-4">Neturiu aruodas.lt skelbimo</p>
+                            <div className="flex items-center text-sm font-medium text-gray-600 group-hover:text-gray-900 group-hover:translate-x-1 transition-all">
+                              Pradėti <ArrowRight className="h-4 w-4 ml-1" />
+                            </div>
                           </button>
                         </div>
 
                         {inputMethod === 'url' ? (
                           <form onSubmit={handleSubmit}>
                             <div className="space-y-4">
-                              <div className="relative">
+                              <motion.div
+                                className="relative"
+                                animate={urlInputHighlight ? {
+                                  scale: [1, 1.05, 1],
+                                  boxShadow: [
+                                    "0 0 0 0px rgba(0,0,0,0)",
+                                    "0 0 0 4px rgba(59, 130, 246, 0.3)",
+                                    "0 0 0 0px rgba(0,0,0,0)"
+                                  ]
+                                } : {}}
+                                transition={{ duration: 0.6, ease: "easeInOut" }}
+                              >
                                 <input
+                                  ref={urlInputRef}
                                   type="url"
                                   value={url}
                                   onChange={(e) => setUrl(e.target.value)}
                                   placeholder="Įklijuokite aruodas.lt nuorodą..."
-                                  className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                                  className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all"
                                   required
                                 />
                                 <Command className="absolute right-3 top-3.5 h-5 w-5 text-gray-400" />
-                              </div>
+                              </motion.div>
 
                               <motion.button
                                 whileHover={{ scale: 1.02 }}
@@ -582,26 +805,73 @@ export default function NotionStyleVersion() {
                               {/* Building & Location */}
                               <div>
                                 <h4 className="font-medium text-gray-900 mb-3">Pastato ir lokacijos duomenys</h4>
-                                <div className="grid grid-cols-2 gap-4">
-                                  <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Statybų metai (po 2000)</label>
-                                    <input
-                                      type="number"
-                                      value={manualData.year_centered}
-                                      onChange={(e) => setManualData({...manualData, year_centered: e.target.value})}
-                                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-gray-900"
-                                      placeholder="pvz. 6 (2006 metai)"
-                                      required
-                                    />
+                                <div className="space-y-4">
+                                  <div className="relative">
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Adresas</label>
+                                    <div className="relative">
+                                      <input
+                                        type="text"
+                                        value={manualData.address}
+                                        onChange={(e) => {
+                                          setManualData({...manualData, address: e.target.value, district: '', dist_to_center_km: ''})
+                                          setSelectedAddressData(null)
+                                          searchAddresses(e.target.value)
+                                        }}
+                                        onFocus={() => {
+                                          if (manualData.address.length >= 3 && addressSuggestions.length > 0) {
+                                            setShowAddressSuggestions(true)
+                                          }
+                                        }}
+                                        className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:ring-2 focus:ring-gray-900"
+
+                                        autoComplete="off"
+                                      />
+                                      {addressSearchLoading && (
+                                        <div className="absolute right-3 top-3">
+                                          <div className="animate-spin h-4 w-4 border-2 border-gray-300 border-t-gray-900 rounded-full"></div>
+                                        </div>
+                                      )}
+                                    </div>
+                                    <p className="text-xs text-gray-500 mt-1">
+                                      {selectedAddressData?.district
+                                        ? `✓ ${selectedAddressData.district} • ${manualData.dist_to_center_km} km nuo centro`
+                                        : addressSearchLoading
+                                        ? 'Ieškoma...'
+                                        : ' '}
+                                    </p>
+
+                                    {/* Address suggestions dropdown */}
+                                    {showAddressSuggestions && addressSuggestions.length > 0 && (
+                                      <div className="absolute z-50 w-full mt-1 bg-white border-2 border-gray-900 rounded-md shadow-xl max-h-60 overflow-y-auto">
+                                        {addressSuggestions.map((suggestion, idx) => (
+                                          <button
+                                            key={idx}
+                                            type="button"
+                                            onClick={() => selectAddress(suggestion)}
+                                            className="w-full px-4 py-3 text-left hover:bg-blue-50 border-b border-gray-200 last:border-b-0 transition-colors"
+                                          >
+                                            <div className="font-medium text-sm text-gray-900">
+                                              {suggestion.address?.road || suggestion.address?.neighbourhood || suggestion.name || 'Adresas'}
+                                              {suggestion.address?.house_number && ` ${suggestion.address.house_number}`}
+                                            </div>
+                                            <div className="text-xs text-gray-600 mt-0.5">
+                                              {suggestion.address?.suburb || suggestion.address?.quarter || suggestion.address?.neighbourhood || 'Vilnius'}, Vilnius
+                                            </div>
+                                          </button>
+                                        ))}
+                                      </div>
+                                    )}
                                   </div>
                                   <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Atstumas iki centro (km)</label>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Statybos metai</label>
                                     <input
                                       type="number"
-                                      step="0.01"
-                                      value={manualData.dist_to_center_km}
-                                      onChange={(e) => setManualData({...manualData, dist_to_center_km: e.target.value})}
+                                      value={manualData.year_built}
+                                      onChange={(e) => setManualData({...manualData, year_built: e.target.value})}
                                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-gray-900"
+                                      placeholder="pvz. 2010"
+                                      min="1900"
+                                      max="2025"
                                       required
                                     />
                                   </div>
@@ -718,52 +988,14 @@ export default function NotionStyleVersion() {
                             </motion.button>
                           </form>
                         )}
-
-                        <div className="mt-4">
-                          <button
-                            onClick={() => {setIsRenting(null); setUrl(''); setActualRentPrice(''); setManualData({
-                              rooms: '', area_m2: '', floor_current: '', floor_total: '', year_centered: '',
-                              dist_to_center_km: '', has_lift: false, has_balcony_terrace: false,
-                              has_parking_spot: false, heat_Centrinis: false, heat_Dujinis: false, heat_Elektra: false
-                            })}}
-                            className="text-sm text-gray-500 hover:text-gray-700"
-                          >
-                            ← Grįžti atgal
-                          </button>
-                        </div>
                       </div>
-                    )}
                   </div>
                 )}
 
                 {loading && (
-                  <div className="py-8">
-                    <div className="flex items-center justify-between mb-4">
-                      <span className="text-sm font-medium text-gray-700">Analizuojame būstą...</span>
-                      <span className="text-sm font-medium text-gray-900">{Math.round(loadingProgress)}%</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2 mb-4">
-                      <motion.div 
-                        className="bg-gray-900 h-2 rounded-full"
-                        initial={{ width: 0 }}
-                        animate={{ width: `${loadingProgress}%` }}
-                        transition={{ duration: 0.5 }}
-                      />
-                    </div>
-                    <div className="grid grid-cols-4 gap-2">
-                      {['Duomenys', 'Parametrai', 'ML Modelis', 'Ataskaita'].map((step, i) => (
-                        <div 
-                          key={step}
-                          className={`text-center py-2 rounded-lg text-xs font-medium ${
-                            loadingProgress > (i + 1) * 25 
-                              ? 'bg-gray-900 text-white' 
-                              : 'bg-gray-100 text-gray-500'
-                          }`}
-                        >
-                          {step}
-                        </div>
-                      ))}
-                    </div>
+                  <div className="py-12 text-center">
+                    <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mb-4"></div>
+                    <p className="text-sm font-medium text-gray-700">Analizuojame būstą...</p>
                   </div>
                 )}
 
@@ -774,56 +1006,150 @@ export default function NotionStyleVersion() {
                       animate={{ opacity: 1, y: 0 }}
                       className="space-y-4"
                     >
-                      <div className="bg-green-50 border border-green-200 rounded-lg p-6">
+                      <div className={`${
+                        result.deal_rating === 'GOOD_DEAL' ? 'bg-green-50 border-green-200' :
+                        result.deal_rating === 'OVERPRICED' ? 'bg-red-50 border-red-200' :
+                        'bg-white border-gray-200'
+                      } border rounded-lg p-6`}>
                         <div className="flex items-center justify-between mb-4">
                           <h3 className="font-semibold text-gray-900">Analizė baigta</h3>
-                          <Gauge className="h-5 w-5 text-green-600" />
+                          <Gauge className={`h-5 w-5 ${
+                            result.deal_rating === 'GOOD_DEAL' ? 'text-green-600' :
+                            result.deal_rating === 'OVERPRICED' ? 'text-red-600' :
+                            'text-gray-600'
+                          }`} />
                         </div>
-                        
-                        <div className="grid grid-cols-3 gap-6">
-                          <div>
-                            <div className="text-3xl font-bold text-gray-900">€{result.total_price}</div>
-                            <div className="text-sm text-gray-500">per mėnesį</div>
+
+                        {result.deal_rating ? (
+                          /* V8 Dashboard Style - Price Comparison */
+                          <div className="space-y-3">
+                            <div className={`${
+                              result.deal_rating === 'GOOD_DEAL' ? 'bg-green-500' :
+                              result.deal_rating === 'OVERPRICED' ? 'bg-red-500' :
+                              'bg-gray-500'
+                            } text-white rounded-lg p-4 flex items-center justify-between`}>
+                              <div>
+                                <div className="text-xs opacity-90">
+                                  {result.deal_rating === 'GOOD_DEAL' ? 'Sutaupytumėte' :
+                                   result.deal_rating === 'OVERPRICED' ? 'Permokėtumėte' :
+                                   result.price_difference > 0 ? 'Sutaupytumėte' : 'Permokėtumėte'}
+                                </div>
+                                <div className="text-3xl font-bold">
+                                  €{Math.round(Math.abs(result.price_difference * 12)).toLocaleString()}
+                                </div>
+                                <div className="text-xs opacity-90">per metus</div>
+                              </div>
+                              {result.deal_rating === 'GOOD_DEAL' ? (
+                                <BadgeCheck className="h-12 w-12 opacity-50" />
+                              ) : result.deal_rating === 'OVERPRICED' ? (
+                                <BadgeAlert className="h-12 w-12 opacity-50" />
+                              ) : (
+                                <Info className="h-12 w-12 opacity-50" />
+                              )}
+                            </div>
+                            <div className="relative grid grid-cols-2 gap-3">
+                              <div className="border-2 border-blue-300 rounded-lg p-4 text-center bg-white">
+                                <div className="text-xs font-medium text-blue-700 mb-1">Tikra vertė</div>
+                                <div className="text-2xl font-bold text-gray-900">€{Math.round(result.total_price)}</div>
+                                <div className="text-xs text-blue-600 mt-1">€{result.price_per_m2}/m²</div>
+                              </div>
+
+                              {/* Floating Price Difference Badge */}
+                              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
+                                <div className={`${
+                                  result.deal_rating === 'GOOD_DEAL' ? 'bg-green-600' :
+                                  result.deal_rating === 'OVERPRICED' ? 'bg-red-600' :
+                                  'bg-gray-600'
+                                } text-white px-3 py-1.5 rounded-lg shadow-md text-center`}>
+                                  <div className="text-[10px] font-medium opacity-80">Skirtumas</div>
+                                  <div className="font-bold text-xs leading-tight">
+                                    {result.price_difference > 0 ? '+' : ''}€{Math.round(Math.abs(result.price_difference))}/mėn
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="border-2 border-gray-300 rounded-lg p-4 text-center bg-white">
+                                <div className="text-xs font-medium text-gray-600 mb-1">Skelbiama</div>
+                                <div className="text-2xl font-bold text-gray-900">€{Math.round(result.listing_price)}</div>
+                                <div className="text-xs text-gray-500 mt-1">per mėnesį</div>
+                              </div>
+                            </div>
+                            <div className="flex items-start space-x-2 text-sm text-gray-700 border border-gray-200 rounded-lg p-3 bg-white">
+                              <Info className={`h-4 w-4 mt-0.5 flex-shrink-0 ${
+                                result.deal_rating === 'GOOD_DEAL' ? 'text-green-600' :
+                                result.deal_rating === 'OVERPRICED' ? 'text-red-600' :
+                                'text-gray-500'
+                              }`} />
+                              <span>
+                                {result.deal_rating === 'GOOD_DEAL' ?
+                                  `${Math.abs(result.price_difference_percent)}% pigiau nei rinkos vertė` :
+                                  result.deal_rating === 'OVERPRICED' ?
+                                  `${Math.abs(result.price_difference_percent)}% aukštesnė kaina nei rinkos vertė` :
+                                  'Kaina atitinka rinkos vidurkį'}
+                              </span>
+                            </div>
                           </div>
-                          <div>
-                            <div className="text-3xl font-bold text-gray-900">€{result.price_per_m2}</div>
-                            <div className="text-sm text-gray-500">už m²</div>
+                        ) : (
+                          /* Regular grid for manual entry (no price comparison) */
+                          <div className="grid grid-cols-3 gap-6">
+                            <div>
+                              <div className="text-3xl font-bold text-gray-900">€{Math.round(result.total_price)}</div>
+                              <div className="text-sm text-gray-500">per mėnesį</div>
+                            </div>
+                            <div>
+                              <div className="text-3xl font-bold text-gray-900">€{result.price_per_m2}</div>
+                              <div className="text-sm text-gray-500">už m²</div>
+                            </div>
+                            <div>
+                              <div className="text-3xl font-bold text-gray-900">{result.confidence}%</div>
+                              <div className="text-sm text-gray-500">patikimumas</div>
+                            </div>
                           </div>
-                          <div>
-                            <div className="text-3xl font-bold text-gray-900">{result.confidence}%</div>
-                            <div className="text-sm text-gray-500">patikimumas</div>
-                          </div>
-                        </div>
+                        )}
                       </div>
 
                       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                         <div className="flex items-start space-x-3">
                           <Bell className="h-5 w-5 text-blue-600 mt-0.5" />
                           <div className="flex-1">
-                            <h4 className="font-medium text-gray-900">Investicijų pranešimai - €5/mėn</h4>
+                            <h4 className="font-medium text-gray-900">Geriausių pasiūlymų pranešimai</h4>
                             <p className="text-sm text-gray-600 mt-1">
-                              Automatiškai skanuojame rinką ir pranešame apie 10-30% neįvertintus būstus. 
-                              Vidutiniškai sutaupoma €200-500 per mėnesį!
+                              Automatiškai skanuojame naujausius skelbimus su geriausiais kainų pasiūlymais.
+                              Nedelsdami jus informuosime. Tai vidutiniškai sutaupo mūsų naudotojams 1050 eurų per metus!
                             </p>
-                            <button className="mt-2 text-sm font-medium text-blue-600 hover:text-blue-700">
-                              Užsisakyti dabar →
-                            </button>
+                            <div className="mt-3 space-y-2">
+                              <div className="flex space-x-2">
+                                <input
+                                  type="email"
+                                  value={newsletterEmail}
+                                  onChange={(e) => setNewsletterEmail(e.target.value)}
+                                  onKeyPress={(e) => e.key === 'Enter' && handleNewsletterSignup()}
+                                  placeholder="Jūsų el. paštas"
+                                  disabled={newsletterStatus === 'loading'}
+                                  className="flex-1 px-3 py-2 text-sm border border-blue-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
+                                />
+                                <button
+                                  onClick={handleNewsletterSignup}
+                                  disabled={newsletterStatus === 'loading'}
+                                  className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                                >
+                                  {newsletterStatus === 'loading' ? 'Siunčiama...' : 'Užsisakyti'}
+                                </button>
+                              </div>
+                              {newsletterMessage && (
+                                <p className={`text-xs ${newsletterStatus === 'success' ? 'text-green-600' : 'text-red-600'}`}>
+                                  {newsletterMessage}
+                                </p>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </div>
 
-                      <div className="flex space-x-3">
-                        <button className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 flex items-center justify-center space-x-2">
-                          <FileText className="h-4 w-4" />
-                          <span>PDF ataskaita</span>
-                        </button>
-                        <button className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 flex items-center justify-center space-x-2">
-                          <Download className="h-4 w-4" />
-                          <span>Excel duomenys</span>
-                        </button>
-                        <button 
+                      <div>
+                        <button
                           onClick={() => {setResult(null); setUrl('')}}
-                          className="flex-1 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800"
+                          className="w-full px-8 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800"
                         >
                           Naujas vertinimas
                         </button>
@@ -851,18 +1177,13 @@ export default function NotionStyleVersion() {
 
             {/* Sidebar */}
             <div className="space-y-6">
-              {/* Price Distribution */}
+              {/* Neighborhood Prices Map */}
               <div className="bg-white rounded-xl border border-gray-200 p-6">
-                <h3 className="text-sm font-semibold text-gray-900 mb-4">Kainų pasiskirstymas</h3>
-                <ResponsiveContainer width="100%" height={200}>
-                  <ScatterChart>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis dataKey="x" name="Plotas" unit="m²" tick={{ fontSize: 10 }} />
-                    <YAxis dataKey="y" name="Kaina" unit="€" tick={{ fontSize: 10 }} />
-                    <Tooltip cursor={{ strokeDasharray: '3 3' }} />
-                    <Scatter name="Būstai" data={scatterData} fill="#3b82f6" />
-                  </ScatterChart>
-                </ResponsiveContainer>
+                <h3 className="text-sm font-semibold text-gray-900 mb-4">Rajonų vidutinės kainos (50m² naujos statybos buto) </h3>
+                <VilniusMap />
+                <p className="text-xs text-gray-500 mt-3 text-center">
+                  Užveskite pelytę ant rajono  žemėlapyje, kad matytumėte kainas
+                </p>
               </div>
 
               {/* Quick Stats */}
@@ -870,20 +1191,20 @@ export default function NotionStyleVersion() {
                 <h3 className="text-sm font-semibold mb-4">Statistika</h3>
                 <div className="space-y-3">
                   <div className="flex justify-between">
-                    <span className="text-gray-400 text-sm">Analizuota</span>
-                    <span className="font-mono">42,132</span>
-                  </div>
-                  <div className="flex justify-between">
                     <span className="text-gray-400 text-sm">Tikslumas</span>
-                    <span className="font-mono">98.2%</span>
+                    <span className="font-mono">97% vidutinis</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-400 text-sm">Atnaujinta</span>
-                    <span className="font-mono">Realiu laiku</span>
+                    <span className="text-gray-400 text-sm">Modelio versija</span>
+                    <span className="font-mono">v2.4</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-400 text-sm">Patirtis</span>
-                    <span className="font-mono">6 metai</span>
+                    <span className="text-gray-400 text-sm">Algoritmas</span>
+                    <span className="font-mono">XGBoost + LightGBM</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400 text-sm">Aprėptis</span>
+                    <span className="font-mono">Vilnius + 15km</span>
                   </div>
                 </div>
               </div>
@@ -893,7 +1214,7 @@ export default function NotionStyleVersion() {
       </section>
 
       {/* Pricing Section */}
-      <section className="py-16 px-4">
+      <section id="pricing" className="py-16 px-4">
         <div className="max-w-5xl mx-auto">
           <div className="text-center mb-12">
             <h2 className="text-3xl font-bold text-gray-900 mb-4">Paprastos kainos</h2>
@@ -923,7 +1244,10 @@ export default function NotionStyleVersion() {
                     {plan.price}
                     <span className="text-sm font-normal text-gray-500">{plan.period}</span>
                   </div>
-                  <p className="text-sm text-gray-600 mt-1">{plan.credits}</p>
+                  <p className="text-sm text-gray-500 mt-2">{plan.pricePerAnalysis}</p>
+                  {plan.savings && (
+                    <p className="text-xs text-green-600 font-medium mt-1">{plan.savings}</p>
+                  )}
                 </div>
                 
                 <ul className="space-y-3 mb-6">
@@ -936,14 +1260,20 @@ export default function NotionStyleVersion() {
                 </ul>
                 
                 <button
-                  onClick={() => setSelectedPlan(plan.id)}
+                  onClick={() => {
+                    if (!user) {
+                      setShowAuthModal(true)
+                    } else {
+                      setShowBuyCreditsModal(true)
+                    }
+                  }}
                   className={`w-full py-2 rounded-lg font-medium transition-colors ${
                     plan.popular
                       ? 'bg-gray-900 text-white hover:bg-gray-800'
                       : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
                   }`}
                 >
-                  Pasirinkti planą
+                  Pirkti
                 </button>
               </motion.div>
             ))}
@@ -952,7 +1282,7 @@ export default function NotionStyleVersion() {
       </section>
 
       {/* FAQ Section */}
-      <section className="py-16 px-4 bg-gray-50">
+      <section id="faq" className="py-16 px-4 bg-gray-50">
         <div className="max-w-3xl mx-auto">
           <h2 className="text-3xl font-bold text-center text-gray-900 mb-8">DUK</h2>
           
@@ -960,19 +1290,31 @@ export default function NotionStyleVersion() {
             {[
               {
                 q: 'Ką galiu gauti su VilRent?',
-                a: 'Gausite tikslų būsto vertinimą (98.2% tikslumas), detalią rinkos analizę, PDF ataskaitas, Excel duomenis ir galimybę gauti pranešimus apie neįvertintus skelbimus.'
+                a: 'Gaunate tikslų būsto kainos vertinimą per 30 sekundžių. Įkeliate aruodas.lt nuorodą arba įvedate duomenis rankiniu būdu, o mūsų AI modelis išanalizuoja ir pateikia rekomendaciją – ar kaina sąžininga, ar būstas pervertintas/per mažai įvertintas.'
               },
               {
                 q: 'Kaip veikia jūsų AI modelis?',
-                a: 'Naudojame LightGBM algoritmą, apmokytą su 40 000+ realių sandorių duomenimis. Analizuojame 47 parametrus: lokaciją, plotą, aukštą, metus, infrastruktūrą ir kt.'
+                a: 'Modelis mokosi iš dešimčių tūkstančių realių sandorių. Kai įvedate būsto duomenis, sistema palygina jį su panašiais būstais – panašiame rajone, panašaus ploto, panašių metų statybos – ir apskaičiuoja teisingą kainą. Tai veikia kaip automatizuotas NT vertintojas, tik greičiau ir be subjektyvumo.'
+              },
+              {
+                q: 'Kaip veikia geriausių pasiūlymų pranešimai?',
+                a: 'Sistema veikia 24/7 ir analizuoja visus naujus skelbimus. Kai pamatome būstą, kuris įkainotas žemiau rinkos kainos (geras sandoris), jums iškart siunčiame pranešimą. Taip sutaupote laiką – nereikia patiems naršyti šimtų skelbimų. Matote tik tuos, kurie tikrai verti dėmesio.'
               },
               {
                 q: 'Kas esate?',
-                a: 'Esame du Oksfordo universiteto statistikos studentai iš Lietuvos. Turime 6 metų patirtį duomenų analizėje ir mašininio mokymosi srityje.'
+                a: 'Esame duomenų mokslo specialistai su patirtimi finansų analizėje ir mašininiu mokymusi. Komanda turi stiprų statistikos išsilavinimą ir praktinę patirtį NT rinkos analizėje Vilniuje. VilRent – mūsų projektas, skirtas padaryti NT vertinimą prieinamą visiems.'
               },
               {
-                q: 'Kaip veikia investicijų pranešimai?',
-                a: 'Už €5/mėn mūsų sistema automatiškai skanuoja naujus skelbimus ir identifikuoja 10-30% neįvertintus būstus. Siunčiame momentinį pranešimą, kad spėtumėte pirmieji!'
+                q: 'Kokius duomenis naudojate analizei?',
+                a: 'Modelis treniruotas su 40,000+ skelbimų duomenimis. Pagrindiniai kintamieji: plotas (m²), kambarių sk., aukštas, pastato aukštų sk., statybų metai, atstumas iki centro (km), infrastruktūra (liftas, balkonas, parkavimas), šildymo tipas, ir rajonas. Taip pat atsižvelgiame į skelbimo sezonališkumą ir rinkos tendencijas.'
+              },
+              {
+                q: 'Ar galiu analizuoti būstus, kurių nėra skelbimuose?',
+                a: 'Žinoma. Turite du pasirinkimus: įklijuoti aruodas.lt nuorodą ARBA pasirinkti "Įvesti duomenis" ir įrašyti visus parametrus patiems. Tai naudinga, jei vertinate savo būstą prieš parduodant, arba žiūrite būstą, kuris dar nepaskelbtas.'
+              },
+              {
+                q: 'Kokius miestus apimate?',
+                a: 'Šiuo metu modelis geriausiai veikia Vilniuje ir artimuose priemiesčiuose, nes būtent su šiais duomenimis jis buvo treniruotas. Kiti Lietuvos miestai (Kaunas, Klaipėda) teoriškai gali veikti, bet tikslumas bus mažesnis. Ateityje planuojame išplėsti geografinę aprėptį.'
               }
             ].map((item, i) => (
               <Accordion.Item key={i} value={`item-${i}`} className="bg-white rounded-lg border border-gray-200">
