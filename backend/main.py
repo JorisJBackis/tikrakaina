@@ -20,6 +20,7 @@ from ab_testing import DualModelPredictor, run_dual_prediction, get_ab_test_stat
 
 # Import SumUp routes
 from sumup_routes import router as sumup_router, webhook_router
+from auth_routes import router as auth_router
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -62,6 +63,7 @@ except Exception as e:
 # Include routers
 app.include_router(sumup_router)
 app.include_router(webhook_router)
+app.include_router(auth_router)
 
 # Pydantic models for request/response
 class PredictionRequest(BaseModel):
