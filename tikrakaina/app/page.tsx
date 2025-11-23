@@ -224,7 +224,12 @@ export default function NotionStyleVersion() {
       const { data: { user }, error } = await supabase.auth.getUser()
 
       if (error) {
-        console.error('Auth error:', error)
+        // Handle AuthSessionMissingError gracefully (user is logged out)
+        if (error.message?.includes('Auth session missing')) {
+          console.log('No active session')
+        } else {
+          console.error('Auth error:', error)
+        }
         setUser(null)
         setUserCredits(0)
         setCheckingAuth(false)
@@ -242,8 +247,13 @@ export default function NotionStyleVersion() {
       } else {
         setUserCredits(0)
       }
-    } catch (err) {
-      console.error('Auth check failed:', err)
+    } catch (err: any) {
+      // Gracefully handle auth session missing error
+      if (err?.message?.includes('Auth session missing')) {
+        console.log('No active session')
+      } else {
+        console.error('Auth check failed:', err)
+      }
       setUser(null)
       setUserCredits(0)
     } finally {
@@ -285,6 +295,9 @@ export default function NotionStyleVersion() {
     console.log('Logging out...')
 
     try {
+      // Sign out from Supabase client-side
+      await supabase.auth.signOut()
+
       // Call API route to properly clear cookies
       const response = await fetch('/api/auth/logout', {
         method: 'POST',
@@ -302,6 +315,10 @@ export default function NotionStyleVersion() {
       window.location.href = '/'
     } catch (error) {
       console.error('Logout error:', error)
+      // Even if there's an error, try to clear state and redirect
+      setUser(null)
+      setUserCredits(0)
+      window.location.href = '/'
     }
   }
 
@@ -690,7 +707,15 @@ export default function NotionStyleVersion() {
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={() => {
-                document.getElementById('valuation-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                const element = document.getElementById('valuation-section')
+                if (element) {
+                  const elementPosition = element.getBoundingClientRect().top + window.pageYOffset
+                  const offsetPosition = elementPosition - 100 // Scroll 100px above the section
+                  window.scrollTo({
+                    top: offsetPosition,
+                    behavior: 'smooth'
+                  })
+                }
               }}
               className="w-full sm:w-auto px-8 md:px-12 py-3 md:py-4 bg-gray-900 text-white text-base md:text-lg rounded-lg hover:bg-gray-800 font-medium"
             >
