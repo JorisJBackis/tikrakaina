@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import * as Accordion from '@radix-ui/react-accordion'
 import { LineChart, Line, AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ScatterChart, Scatter } from 'recharts'
-import { Zap, Check, ChevronDown, Bell, Sparkles, Search, Command, FileText, Download, Gauge, LogOut, RefreshCw, Link as LinkIcon, ArrowRight, BadgeAlert, BadgeCheck, Info } from 'lucide-react'
+import { Zap, Check, ChevronDown, Bell, Sparkles, Command, FileText, Download, Gauge, LogOut, RefreshCw, Link as LinkIcon, ArrowRight, BadgeAlert, BadgeCheck, Info } from 'lucide-react'
 import { supabase, getUserCredits, deductCredits, savePrediction, saveRentalTrainingData, saveNewsletterSignup, trackEvent } from '@/lib/supabase'
 import AuthModal from '@/components/AuthModal'
 import BuyCreditsModal from '@/components/BuyCreditsModal'
@@ -590,9 +590,6 @@ export default function NotionStyleVersion() {
               </nav>
             </div>
             <div className="flex items-center space-x-2">
-              <button className="p-2 hover:bg-gray-100 rounded-md">
-                <Search className="h-4 w-4 text-gray-600" />
-              </button>
               {user ? (
                 <>
                   <UserCredits
