@@ -275,14 +275,22 @@ async def verify_payment_manually(
                         "sumup_raw": checkout,
                     })
 
-                    # If payment successful, add credits to user account
+                    # If payment successful, add credits to user account (only once)
                     credits_added = 0
                     if new_status == PaymentStatus.PAID.value and attempt.get("user_id"):
-                        credits_to_add = attempt.get("credits_purchased", 1)
-                        success = await add_credits_to_user(attempt["user_id"], credits_to_add)
-                        if success:
-                            credits_added = credits_to_add
-                            logger.info(f"[Manual Verify] Added {credits_to_add} credits to user {attempt['user_id']}")
+                        # Check if credits were already added (idempotency)
+                        if not attempt.get("credits_added"):
+                            credits_to_add = attempt.get("credits_purchased", 1)
+                            success = await add_credits_to_user(attempt["user_id"], credits_to_add)
+                            if success:
+                                credits_added = credits_to_add
+                                # Mark credits as added in database
+                                await update_payment_attempt(ref, {"credits_added": True})
+                                logger.info(f"[Manual Verify] Added {credits_to_add} credits to user {attempt['user_id']}")
+                            else:
+                                logger.error(f"[Manual Verify] Failed to add credits to user {attempt['user_id']}")
+                        else:
+                            logger.info(f"[Manual Verify] Credits already added for payment {ref}, skipping")
 
                     return JSONResponse({
                         "ref": ref,
@@ -512,16 +520,22 @@ async def sumup_webhook(request: Request):
 
             logger.info(f"Payment {ref} verified and updated to {new_status}")
 
-            # If payment successful, add credits to user account
+            # If payment successful, add credits to user account (only once)
             credits_added = 0
             if new_status == PaymentStatus.PAID.value and attempt.get("user_id"):
-                credits_to_add = attempt.get("credits_purchased", 1)
-                success = await add_credits_to_user(attempt["user_id"], credits_to_add)
-                if success:
-                    credits_added = credits_to_add
-                    logger.info(f"Added {credits_to_add} credits to user {attempt['user_id']}")
+                # Check if credits were already added (idempotency)
+                if not attempt.get("credits_added"):
+                    credits_to_add = attempt.get("credits_purchased", 1)
+                    success = await add_credits_to_user(attempt["user_id"], credits_to_add)
+                    if success:
+                        credits_added = credits_to_add
+                        # Mark credits as added in database
+                        await update_payment_attempt(ref, {"credits_added": True})
+                        logger.info(f"[Webhook] Added {credits_to_add} credits to user {attempt['user_id']}")
+                    else:
+                        logger.error(f"[Webhook] Failed to add credits to user {attempt['user_id']}")
                 else:
-                    logger.error(f"Failed to add credits to user {attempt['user_id']}")
+                    logger.info(f"[Webhook] Credits already added for payment {ref}, skipping")
 
             return JSONResponse({"status": "ok", "verified_status": new_status, "creditsAdded": credits_added})
 

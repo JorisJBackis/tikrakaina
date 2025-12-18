@@ -65,6 +65,7 @@ export default function NotionStyleVersion() {
   // Ref for URL input
   const urlInputRef = React.useRef<HTMLInputElement>(null)
 
+
   // Vilnius city center coordinates (same as backend)
   const CITY_CENTER = { lat: 54.6872, lon: 25.2797 }
 
@@ -448,8 +449,11 @@ export default function NotionStyleVersion() {
   }
 
   setLoading(true);
-  // Don't clear result - prevents white flash and scroll jump on mobile
-  // setResult(null);
+
+  // Scroll up to show loading/result - use fixed position since section may move
+  setTimeout(() => {
+    window.scrollTo({ top: 500, behavior: 'smooth' })
+  }, 50);
 
   // 📊 Track analysis start
   trackEvent('analysis_started', {
@@ -606,8 +610,11 @@ export default function NotionStyleVersion() {
     // Show results ONLY after all async operations are done
     setResult(data);
 
-    // Don't auto-scroll - let user stay at results section
-    // (Removed formElement.scrollIntoView to fix mobile scroll issue)
+    // Scroll to valuation section when result appears
+    const section = document.getElementById('valuation-section')
+    if (section) {
+      section.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
 
     // 📊 Track analysis completion
     trackEvent('analysis_completed', {
@@ -1224,7 +1231,7 @@ export default function NotionStyleVersion() {
                           /* Sleek result display for manual entry without price comparison */
                           <div className="space-y-3 md:space-y-4">
                             <div className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg p-4 md:p-6">
-                              <div className="text-xs md:text-sm font-medium text-gray-600 mb-2">Nuomos kaina</div>
+                              <div className="text-xs md:text-sm font-medium text-gray-600 mb-2">Rekomenduojama nuomos kaina</div>
                               <div className="text-3xl md:text-4xl font-bold text-gray-900">€{Math.round(result.total_price)}</div>
                               <div className="text-xs md:text-sm text-gray-500 mt-1">per mėnesį</div>
                             </div>
@@ -1235,7 +1242,7 @@ export default function NotionStyleVersion() {
                               </div>
                               <div className="border border-gray-200 rounded-lg p-3 md:p-4 bg-white">
                                 <div className="text-[10px] md:text-xs font-medium text-gray-600 mb-1">Plotas</div>
-                                <div className="text-xl md:text-2xl font-bold text-gray-900">{result.area_m2 || '--'} m²</div>
+                                <div className="text-xl md:text-2xl font-bold text-gray-900">{result.area_m2 || manualData.area_m2 || '--'} m²</div>
                               </div>
                             </div>
                           </div>

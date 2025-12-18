@@ -1,9 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, memo } from 'react'
 import { trackEvent } from '@/lib/supabase'
 
-export default function VilniusMap() {
+export default memo(function VilniusMap() {
   const [isExpanded, setIsExpanded] = useState(false)
 
   const MapIframe = ({ height }: { height: string }) => (
@@ -85,4 +85,4 @@ export default function VilniusMap() {
       )}
     </>
   )
-}
+})

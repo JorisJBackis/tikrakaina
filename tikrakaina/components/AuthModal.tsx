@@ -16,6 +16,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess, mode = 'default'
   const [isLogin, setIsLogin] = useState(mode === 'freeTrialExhausted' ? false : true)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -57,6 +58,13 @@ export default function AuthModal({ isOpen, onClose, onSuccess, mode = 'default'
     e.preventDefault()
     setLoading(true)
     setError(null)
+
+    // Validate password match for signup
+    if (!isLogin && password !== confirmPassword) {
+      setError('Slaptažodžiai nesutampa')
+      setLoading(false)
+      return
+    }
 
     try {
       if (isLogin) {
@@ -128,7 +136,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess, mode = 'default'
 
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-2xl font-bold text-gray-900">
-              {mode === 'freeTrialExhausted' ? 'Sukurti paskyrą' : (isLogin ? 'Prisijungti' : 'Registruotis')}
+              {isLogin ? 'Prisijungti' : 'Susikurkite paskyrą'}
             </h2>
             <button
               onClick={onClose}
@@ -234,6 +242,26 @@ export default function AuthModal({ isOpen, onClose, onSuccess, mode = 'default'
               </div>
             </div>
 
+            {!isLogin && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Pakartokite slaptažodį
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
+                  <input
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                    placeholder="••••••••"
+                    required
+                    minLength={6}
+                  />
+                </div>
+              </div>
+            )}
+
             {error && (
               <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
                 <p className="text-sm text-red-600">{error}</p>
@@ -250,18 +278,34 @@ export default function AuthModal({ isOpen, onClose, onSuccess, mode = 'default'
           </form>
 
           <div className="mt-6 text-center">
-            <p className="text-sm text-gray-600">
-              {isLogin ? 'Neturite paskyros?' : 'Jau turite paskyrą?'}{' '}
-              <button
-                onClick={() => {
-                  setIsLogin(!isLogin)
-                  setError(null)
-                }}
-                className="font-medium text-gray-900 hover:underline"
-              >
-                {isLogin ? 'Registruotis' : 'Prisijungti'}
-              </button>
-            </p>
+            {isLogin ? (
+              <div className="space-y-3">
+                <p className="text-sm text-gray-500">Neturite paskyros?</p>
+                <button
+                  onClick={() => {
+                    setIsLogin(false)
+                    setError(null)
+                    setConfirmPassword('')
+                  }}
+                  className="w-full py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
+                >
+                  Susikurkite paskyrą
+                </button>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-600">
+                Jau turite paskyrą?{' '}
+                <button
+                  onClick={() => {
+                    setIsLogin(true)
+                    setError(null)
+                  }}
+                  className="font-medium text-gray-900 hover:underline"
+                >
+                  Prisijungti
+                </button>
+              </p>
+            )}
           </div>
         </motion.div>
       </div>
