@@ -1310,8 +1310,10 @@ export default function NotionStyleVersion() {
                                       {/* Info tooltip for Plotas (area) - explain economies of scale */}
                                       {item.label === 'Plotas' && (
                                         <div className="relative group">
-                                          <Info className="h-3 w-3 text-gray-400 cursor-help" />
-                                          <div className="absolute bottom-full left-0 mb-1 hidden group-hover:block z-50">
+                                          <button type="button" className="p-1 -m-1 focus:outline-none" tabIndex={0}>
+                                            <Info className="h-3 w-3 text-gray-400 cursor-help" />
+                                          </button>
+                                          <div className="absolute bottom-full left-0 mb-1 hidden group-hover:block group-focus-within:block z-50">
                                             <div className="bg-gray-800 text-white text-[10px] rounded px-2 py-1.5 w-48 shadow-lg">
                                               {item.value > 0
                                                 ? "Mažesni butai turi aukštesnę kainą už m², nes fiksuotos išlaidos (virtuvė, vonia) paskirstomos mažesniam plotui."
