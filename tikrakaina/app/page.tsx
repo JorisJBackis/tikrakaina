@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import * as Accordion from '@radix-ui/react-accordion'
 import { LineChart, Line, AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ScatterChart, Scatter } from 'recharts'
-import { Zap, Check, ChevronDown, Bell, Sparkles, Command, FileText, Download, Gauge, LogOut, RefreshCw, Link as LinkIcon, ArrowRight, BadgeAlert, BadgeCheck, Info } from 'lucide-react'
+import { Zap, Check, ChevronDown, Bell, Sparkles, Command, FileText, Download, Gauge, LogOut, RefreshCw, Link as LinkIcon, ArrowRight, BadgeAlert, BadgeCheck, Info, TrendingUp, TrendingDown } from 'lucide-react'
 import { supabase, getUserCredits, deductCredits, savePrediction, saveRentalTrainingData, saveNewsletterSignup, trackEvent, trackAnonymousAnalysis, hasExceededFreeTrial } from '@/lib/supabase'
 import { generateDeviceFingerprint, hasUsedFreeTrial, incrementLocalAnalysisCount, getUserIP } from '@/lib/deviceFingerprint'
 import AuthModal from '@/components/AuthModal'
@@ -21,6 +21,7 @@ export default function NotionStyleVersion() {
   const [url, setUrl] = useState('')
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<any>(null)
+  const [showShapExplanation, setShowShapExplanation] = useState(true)
   const [loadingProgress, setLoadingProgress] = useState(0)
   const [selectedPlan, setSelectedPlan] = useState('starter')
   const [isRenting, setIsRenting] = useState<boolean | null>(false)
@@ -741,7 +742,7 @@ export default function NotionStyleVersion() {
           </h1>
 
           <p className="text-base md:text-xl text-gray-600 mb-6 md:mb-8 max-w-2xl mx-auto px-2">
-            40 000+ būstų analizė. 2% paklaida. Sutaupyk tūkstančius.
+            40 000+ būstų analizė. 5% paklaida. Sutaupyk tūkstančius.
           </p>
 
 <div className="flex justify-center mb-6 md:mb-8 px-4">
@@ -768,7 +769,7 @@ export default function NotionStyleVersion() {
           <div className="flex flex-wrap justify-center gap-3 md:gap-8 text-xs md:text-sm text-gray-500 px-2">
             <span className="flex items-center"><Check className="h-3 w-3 md:h-4 md:w-4 mr-1 text-green-500" /> Be prisijungimo</span>
             <span className="flex items-center"><Check className="h-3 w-3 md:h-4 md:w-4 mr-1 text-green-500" /> 30 sek analizė</span>
-            <span className="flex items-center"><Check className="h-3 w-3 md:h-4 md:w-4 mr-1 text-green-500" /> 2% paklaida</span>
+            <span className="flex items-center"><Check className="h-3 w-3 md:h-4 md:w-4 mr-1 text-green-500" /> 5% paklaida</span>
           </div>
         </div>
       </section>
@@ -1249,6 +1250,187 @@ export default function NotionStyleVersion() {
                         )}
                       </div>
 
+                      {/* SHAP Explanation Section */}
+                      {result.shap_explanation && (
+                        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                          <button
+                            onClick={() => setShowShapExplanation(!showShapExplanation)}
+                            className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-gray-50 transition-colors"
+                          >
+                            <div className="flex items-center gap-2">
+                              <TrendingUp className="h-4 w-4 text-blue-600" />
+                              <span className="font-semibold text-gray-900 text-sm">Kaip gavome šią kainą?</span>
+                            </div>
+                            <ChevronDown className={`h-4 w-4 text-gray-500 transition-transform ${showShapExplanation ? 'rotate-180' : ''}`} />
+                          </button>
+
+                          {showShapExplanation && (
+                            <div className="px-4 pb-4 space-y-4 border-t border-gray-100">
+                              {/* Summary text */}
+                              <p className="text-gray-700 text-sm italic border-l-2 border-blue-400 pl-3 mt-3">
+                                {result.shap_explanation.summary_lt}
+                              </p>
+
+                              {/* Base value - shown separately as starting point */}
+                              <div className="flex items-center justify-between text-sm mb-3 pb-2 border-b border-gray-200">
+                                <span className="text-gray-600">Bazinė kaina (Vilniaus vidurkis)</span>
+                                <span className="font-semibold text-blue-600">€{result.shap_explanation.base_value?.toFixed(2)}/m²</span>
+                              </div>
+
+                              {/* Waterfall visualization */}
+                              <div className="space-y-2">
+                                {(() => {
+                                  // Calculate min/max absolute SHAP values for anchored proportions
+                                  const shapItems = result.shap_explanation.waterfall?.filter((i: any) =>
+                                    i.type !== 'base' && i.type !== 'total'
+                                  ) || [];
+                                  const absValues = shapItems.map((i: any) => Math.abs(i.value));
+                                  const maxShapValue = Math.max(...absValues, 0.01);
+                                  const minShapValue = Math.min(...absValues, 0.01);
+
+                                  return result.shap_explanation.waterfall?.filter((item: any) => item.type !== 'base').map((item: any, index: number) => {
+                                    // Bar width: use sqrt scaling on magnitudes, min-w-max ensures text fits
+                                    const absVal = Math.abs(item.value);
+                                    // Sqrt-based ratio: sqrt(val) - sqrt(min) / sqrt(max) - sqrt(min)
+                                    const sqrtMin = Math.sqrt(minShapValue);
+                                    const sqrtMax = Math.sqrt(maxShapValue);
+                                    const sqrtVal = Math.sqrt(absVal);
+                                    const ratio = sqrtMax > sqrtMin ? (sqrtVal - sqrtMin) / (sqrtMax - sqrtMin) : 1;
+                                    const clampedRatio = Math.min(1, Math.max(0, ratio));
+                                    // Width: ratio * 100%, but min-w-max CSS class ensures text always fits
+                                    const barWidthPercent = clampedRatio * 100;
+
+                                    return (
+                                  <div key={index} className="flex items-center gap-2">
+                                    {/* Label with extracted value */}
+                                    <div className="w-36 text-xs text-right flex items-center justify-end gap-1">
+                                      <span className="text-gray-700">{item.label}</span>
+                                      {item.display_value && (
+                                        <span className="text-gray-400">({item.display_value})</span>
+                                      )}
+                                      {/* Info tooltip for Plotas (area) - explain economies of scale */}
+                                      {item.label === 'Plotas' && (
+                                        <div className="relative group">
+                                          <Info className="h-3 w-3 text-gray-400 cursor-help" />
+                                          <div className="absolute bottom-full left-0 mb-1 hidden group-hover:block z-50">
+                                            <div className="bg-gray-800 text-white text-[10px] rounded px-2 py-1.5 w-48 shadow-lg">
+                                              {item.value > 0
+                                                ? "Mažesni butai turi aukštesnę kainą už m², nes fiksuotos išlaidos (virtuvė, vonia) paskirstomos mažesniam plotui."
+                                                : "Didesni butai turi žemesnę kainą už m², nes fiksuotos išlaidos (virtuvė, vonios kambarys) paskirstomos didesniam plotui."
+                                              }
+                                            </div>
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    {/* Bar */}
+                                    <div className="flex-1 h-6 relative">
+                                      {item.type === 'total' && (
+                                        <div className="h-full bg-gradient-to-r from-green-500 to-emerald-500 rounded flex items-center justify-end pr-2">
+                                          <span className="text-xs text-white font-bold">
+                                            €{item.value.toFixed(2)}/m²
+                                          </span>
+                                        </div>
+                                      )}
+                                      {item.type === 'positive' && (
+                                        <div
+                                          className="h-full bg-green-100 border border-green-300 rounded inline-flex items-center px-2 whitespace-nowrap"
+                                          style={{ width: `${barWidthPercent}%`, minWidth: 'max-content' }}
+                                        >
+                                          <span className="text-xs text-green-700 font-medium">
+                                            +€{item.value.toFixed(2)}
+                                          </span>
+                                        </div>
+                                      )}
+                                      {item.type === 'negative' && (
+                                        <div
+                                          className="h-full bg-red-100 border border-red-300 rounded inline-flex items-center px-2 whitespace-nowrap"
+                                          style={{ width: `${barWidthPercent}%`, minWidth: 'max-content' }}
+                                        >
+                                          <span className="text-xs text-red-700 font-medium">
+                                            €{item.value.toFixed(2)}
+                                          </span>
+                                        </div>
+                                      )}
+                                      {item.type === 'other' && (
+                                        <div
+                                          className="h-full bg-gray-100 border border-gray-300 rounded inline-flex items-center px-2 whitespace-nowrap"
+                                          style={{ width: `${barWidthPercent}%`, minWidth: 'max-content' }}
+                                        >
+                                          <span className="text-xs text-gray-600 font-medium">
+                                            {item.value > 0 ? '+' : ''}€{item.value.toFixed(2)}
+                                          </span>
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    {/* Cumulative value */}
+                                    <div className="w-14 text-xs text-gray-500 text-right">
+                                      {item.type !== 'base' && item.type !== 'total' && (
+                                        <span>= €{item.cumulative.toFixed(2)}</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                    );
+                                  });
+                                })()}
+                              </div>
+
+                              {/* Top factors summary */}
+                              <div className="grid grid-cols-2 gap-3 pt-2">
+                                {/* Positive factors */}
+                                <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                                  <div className="text-xs text-green-700 font-semibold mb-2 flex items-center gap-1">
+                                    <TrendingUp className="h-3 w-3" /> Didina kainą
+                                  </div>
+                                  <div className="space-y-1.5">
+                                    {result.shap_explanation.top_positive?.slice(0, 3).map((c: any, i: number) => (
+                                      <div key={i} className="text-xs">
+                                        <div className="flex justify-between items-center">
+                                          <span className="text-gray-700 truncate">{c.feature_name_lt}</span>
+                                          <span className="text-green-600 font-medium ml-2">+€{c.shap_value.toFixed(2)}</span>
+                                        </div>
+                                        {c.display_value && (
+                                          <div className="text-gray-400 text-[10px]">{c.display_value}</div>
+                                        )}
+                                      </div>
+                                    ))}
+                                    {(!result.shap_explanation.top_positive || result.shap_explanation.top_positive.length === 0) && (
+                                      <div className="text-xs text-gray-500">Nėra teigiamų faktorių</div>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* Negative factors */}
+                                <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                                  <div className="text-xs text-red-700 font-semibold mb-2 flex items-center gap-1">
+                                    <TrendingDown className="h-3 w-3" /> Mažina kainą
+                                  </div>
+                                  <div className="space-y-1.5">
+                                    {result.shap_explanation.top_negative?.slice(0, 3).map((c: any, i: number) => (
+                                      <div key={i} className="text-xs">
+                                        <div className="flex justify-between items-center">
+                                          <span className="text-gray-700 truncate">{c.feature_name_lt}</span>
+                                          <span className="text-red-600 font-medium ml-2">€{c.shap_value.toFixed(2)}</span>
+                                        </div>
+                                        {c.display_value && (
+                                          <div className="text-gray-400 text-[10px]">{c.display_value}</div>
+                                        )}
+                                      </div>
+                                    ))}
+                                    {(!result.shap_explanation.top_negative || result.shap_explanation.top_negative.length === 0) && (
+                                      <div className="text-xs text-gray-500">Nėra neigiamų faktorių</div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+
+                            </div>
+                          )}
+                        </div>
+                      )}
+
                       <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 md:p-4">
                         <div className="flex items-start space-x-2 md:space-x-3">
                           <Bell className="h-4 w-4 md:h-5 md:w-5 text-blue-600 mt-0.5 flex-shrink-0" />
@@ -1333,7 +1515,7 @@ export default function NotionStyleVersion() {
                 <div className="space-y-2 md:space-y-3">
                   <div className="flex justify-between">
                     <span className="text-gray-400 text-xs md:text-sm">Paklaida</span>
-                    <span className="font-mono text-xs md:text-sm">2%</span>
+                    <span className="font-mono text-xs md:text-sm">5%</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-400 text-xs md:text-sm">Modelio versija</span>

@@ -18,6 +18,9 @@ from model_utils import scrape_listing, featurise, predict_from_url
 # Import A/B testing module (NEW - runs both models)
 from ab_testing import DualModelPredictor, run_dual_prediction, get_ab_test_stats, get_ab_test_history
 
+# Import SHAP explainer for model explanations
+from shap_explainer import get_explainer as get_shap_explainer, explain_prediction
+
 # Import SumUp routes
 from sumup_routes import router as sumup_router, webhook_router
 from auth_routes import router as auth_router
@@ -60,6 +63,15 @@ except Exception as e:
     logger.error(f"❌ Failed to initialize A/B testing system: {e}")
     dual_predictor = None
 
+# Initialize SHAP Explainer for model explanations
+shap_explainer = None
+try:
+    shap_explainer = get_shap_explainer()
+    logger.info("🧠 SHAP Explainer initialized!")
+except Exception as e:
+    logger.warning(f"⚠️ SHAP Explainer failed to initialize: {e}")
+    shap_explainer = None
+
 # Include routers
 app.include_router(sumup_router)
 app.include_router(webhook_router)
@@ -100,6 +112,7 @@ class PredictionResponse(BaseModel):
     deal_rating: Optional[str] = None  # "GOOD_DEAL", "FAIR_PRICE", "OVERPRICED"
     features: Optional[Dict[str, Any]] = None
     analysis: Optional[Dict[str, str]] = None
+    shap_explanation: Optional[Dict[str, Any]] = None  # SHAP-based explanation
     error: Optional[str] = None
 
 class StatsResponse(BaseModel):
@@ -171,6 +184,11 @@ async def predict(request: PredictionRequest):
 
     url_str = str(request.url)
 
+    # Normalize mobile URLs to desktop URLs (m.aruodas.lt -> www.aruodas.lt)
+    if "//m.aruodas.lt/" in url_str:
+        url_str = url_str.replace("//m.aruodas.lt/", "//www.aruodas.lt/")
+        logger.info(f"📱 Normalized mobile URL to: {url_str}")
+
     # Check if URL is from aruodas.lt
     if "aruodas.lt" not in url_str:
         return PredictionResponse(
@@ -223,6 +241,15 @@ async def predict(request: PredictionRequest):
                         )
                         logger.info(f"📊 Deal rating: {deal_rating} ({price_diff_pct:+.1f}%)")
 
+                # Generate SHAP explanation
+                shap_explanation = None
+                if shap_explainer:
+                    try:
+                        shap_explanation = get_shap_explanation(new_model_data["features_used"])
+                        logger.info(f"🧠 SHAP explanation generated")
+                    except Exception as e:
+                        logger.warning(f"⚠️ SHAP explanation failed: {e}")
+
                 response = PredictionResponse(
                     success=True,
                     price_per_m2=new_model_data["price_per_m2"],
@@ -233,7 +260,8 @@ async def predict(request: PredictionRequest):
                     price_difference_percent=price_diff_pct,
                     deal_rating=deal_rating,
                     features=new_model_data["features_used"],
-                    analysis=analysis
+                    analysis=analysis,
+                    shap_explanation=shap_explanation
                 )
 
                 # Cache the result
@@ -390,6 +418,18 @@ async def predict_manual(request: ManualPredictionRequest):
             features_dict
         )
 
+        # Generate SHAP explanation
+        shap_explanation = None
+        if shap_explainer:
+            try:
+                # Add district to features_dict for SHAP
+                features_for_shap = features_dict.copy()
+                features_for_shap["district_encoded"] = district_val
+                shap_explanation = get_shap_explanation(features_for_shap)
+                logger.info(f"🧠 SHAP explanation generated for manual prediction")
+            except Exception as e:
+                logger.warning(f"⚠️ SHAP explanation failed: {e}")
+
         result = PredictionResponse(
             success=True,
             price_per_m2=round(float(pred_price_pm2), 2),
@@ -397,7 +437,8 @@ async def predict_manual(request: ManualPredictionRequest):
             confidence=confidence,
             features={k: (float(v) if isinstance(v, (int, float, np.number)) else str(v))
                      for k, v in features_df.iloc[0].to_dict().items()},
-            analysis=analysis
+            analysis=analysis,
+            shap_explanation=shap_explanation
         )
 
         logger.info(f"✅ Manual prediction (NEW MODEL): €{result.price_per_m2}/m² (€{result.total_price} total)")
@@ -566,6 +607,71 @@ def calculate_deal_rating(predicted_price: float, listing_price: float) -> tuple
         rating = "FAIR_PRICE"
 
     return round(difference, 2), round(difference_percent, 1), rating
+
+
+def get_shap_explanation(features: dict) -> Optional[Dict[str, Any]]:
+    """
+    Generate SHAP explanation for a prediction.
+    Converts features dict to DataFrame and calls SHAP explainer.
+    """
+    if shap_explainer is None:
+        return None
+
+    try:
+        # Load feature order and district categories
+        with open("feature_order.json", "r") as f:
+            feature_order = json.load(f)
+        with open("district_categories.json", "r") as f:
+            district_categories = json.load(f)
+
+        # Build feature DataFrame
+        feature_data = {}
+        for feat in feature_order:
+            if feat == "district_encoded":
+                # Handle district categorical
+                district_val = features.get("district_encoded", "Other")
+                if isinstance(district_val, str):
+                    feature_data[feat] = district_val
+                else:
+                    feature_data[feat] = str(district_val) if district_val else "Other"
+            else:
+                # Numeric features - handle None, NaN, and various types
+                val = features.get(feat)
+                try:
+                    if val is None:
+                        feature_data[feat] = 0.0
+                    elif isinstance(val, (int, float, np.number)):
+                        if pd.isna(val):
+                            feature_data[feat] = 0.0
+                        else:
+                            feature_data[feat] = float(val)
+                    elif isinstance(val, str):
+                        feature_data[feat] = float(val) if val else 0.0
+                    else:
+                        feature_data[feat] = 0.0
+                except (ValueError, TypeError):
+                    feature_data[feat] = 0.0
+
+        # Create DataFrame
+        df = pd.DataFrame([feature_data])
+        df["district_encoded"] = pd.Categorical(
+            df["district_encoded"],
+            categories=district_categories
+        )
+        df = df[feature_order]
+
+        # Get SHAP explanation
+        explanation = shap_explainer.explain(df)
+
+        # Add area for total price calculation context
+        if "area_m2" in features and features["area_m2"]:
+            explanation["area_m2"] = float(features["area_m2"])
+
+        return explanation
+
+    except Exception as e:
+        logger.error(f"❌ get_shap_explanation error: {e}")
+        return None
 
 
 # ============================================================================

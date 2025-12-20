@@ -14,11 +14,10 @@ from typing import Dict, Any, Optional, Tuple
 import pandas as pd
 import numpy as np
 from database import supabase
-from geopy.geocoders import Nominatim
 from geopy.distance import geodesic
 
 # Import old model utilities
-from model_utils import scrape_listing as scrape_old, featurise as featurise_old, _parse_number
+from model_utils import scrape_listing as scrape_old, featurise as featurise_old, _parse_number, _geocode_addr
 
 # Import new model utilities (only the ones that exist)
 from vilrent_utils import (
@@ -153,20 +152,26 @@ def featurise_new(raw_dict: dict, district_categories: pd.Index, feature_order: 
     lat = df.get('latitude', pd.Series([None])).iloc[0]
     lon = df.get('longitude', pd.Series([None])).iloc[0]
 
+    # Use the same robust geocoding with fallbacks as the old model
     if pd.isna(lat) or pd.isna(lon):
-        # Try geocoding
-        geocoder = Nominatim(user_agent="rent_model_geocoder", timeout=10)
-
+        # Try with district first
         parts_with = [p for p in [city, district, street] if p]
         base_with = ", ".join(parts_with)
         addr_with = f"{base_with} {house}" if (base_with and house) else base_with
 
-        try:
-            loc = geocoder.geocode(addr_with)
-            if loc:
-                lat, lon = loc.latitude, loc.longitude
-        except:
-            pass
+        lat, lon = _geocode_addr(addr_with)
+        if (lat is None or lon is None) and house:
+            lat, lon = _geocode_addr(base_with)
+
+        # Retry without district if still no results
+        if (lat is None or lon is None):
+            parts_no = [p for p in [city, street] if p]
+            base_no = ", ".join(parts_no)
+            addr_no = f"{base_no} {house}" if (base_no and house) else base_no
+
+            lat, lon = _geocode_addr(addr_no)
+            if (lat is None or lon is None) and house:
+                lat, lon = _geocode_addr(base_no)
 
     df["latitude"] = lat
     df["longitude"] = lon
@@ -306,6 +311,11 @@ async def run_dual_prediction(
         "raw_data": {...}
     }
     """
+
+    # Normalize mobile URLs to desktop URLs
+    if "//m.aruodas.lt/" in url:
+        url = url.replace("//m.aruodas.lt/", "//www.aruodas.lt/")
+        logger.info(f"📱 Normalized mobile URL to: {url}")
 
     result = {
         "success": False,
