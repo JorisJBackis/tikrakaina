@@ -1302,8 +1302,8 @@ export default function NotionStyleVersion() {
                                     return (
                                   <div key={index} className="flex items-center gap-2">
                                     {/* Label with extracted value */}
-                                    <div className="w-44 text-xs text-right flex items-center justify-end gap-1 whitespace-nowrap">
-                                      <span className="text-gray-700">{item.label}</span>
+                                    <div className="w-32 text-xs text-right flex items-center justify-end gap-1">
+                                      <span className="text-gray-700 whitespace-nowrap">{item.label}</span>
                                       {item.display_value && (
                                         <span className="text-gray-400">({item.display_value})</span>
                                       )}
