@@ -612,6 +612,15 @@ def get_active_listing_ids(supabase: Client) -> set:
     return {row["listing_id"] for row in result.data}
 
 
+def get_all_listing_ids(supabase: Client) -> set:
+    """Get ALL listing IDs from database (any status)."""
+    result = supabase.table("listing_lifecycle") \
+        .select("listing_id") \
+        .execute()
+
+    return {row["listing_id"] for row in result.data}
+
+
 def get_listing_prices(supabase: Client) -> Dict[int, int]:
     """Get last known prices for active listings."""
     result = supabase.table("listing_lifecycle") \
@@ -1054,21 +1063,29 @@ def run_daily_collection(test_mode: bool = False, bootstrap: bool = False):
 
     # Step 2: Get database state
     logger.info("\n🗃️ Step 2: Loading database state")
-    db_active_ids = get_active_listing_ids(supabase)
+    db_all_ids = get_all_listing_ids(supabase)  # ALL listings ever tracked
+    db_active_ids = get_active_listing_ids(supabase)  # Only ACTIVE ones
     db_prices = get_listing_prices(supabase)
     phone_counts = get_phone_counts(supabase)
 
+    logger.info(f"  Total in DB: {len(db_all_ids)}")
     logger.info(f"  Active in DB: {len(db_active_ids)}")
 
     # Step 3: Calculate diffs
-    new_ids = current_ids - db_active_ids
+    # NEW = listings we've NEVER seen before (not in db_all_ids)
+    # MISSING = was ACTIVE but no longer on site
+    # EXISTING = still on site and was ACTIVE
+    # REAPPEARED = was in DB (not active) but back on site
+    new_ids = current_ids - db_all_ids  # Truly new (never tracked)
     missing_ids = db_active_ids - current_ids
     existing_ids = current_ids & db_active_ids
+    reappeared_ids = (current_ids & db_all_ids) - db_active_ids  # Was tracked, not active, but back
 
     logger.info(f"\n📊 Step 3: Diff results")
     logger.info(f"  NEW: {len(new_ids)}")
     logger.info(f"  MISSING: {len(missing_ids)}")
     logger.info(f"  EXISTING: {len(existing_ids)}")
+    logger.info(f"  REAPPEARED: {len(reappeared_ids)}")
 
     # Step 4: Process NEW listings
     logger.info(f"\n🆕 Step 4: Processing {len(new_ids)} new listings")
@@ -1122,6 +1139,23 @@ def run_daily_collection(test_mode: bool = False, bootstrap: bool = False):
             logger.info(f"  Processed {new_count}/{len(new_ids)} new listings")
 
     logger.info(f"  ✅ Added {new_count} new listings (skipped {skipped_old} old listings >40 days)")
+
+    # Step 4b: Reactivate REAPPEARED listings
+    if reappeared_ids:
+        logger.info(f"\n🔄 Step 4b: Reactivating {len(reappeared_ids)} reappeared listings")
+        reactivated = 0
+        for listing_id in reappeared_ids:
+            try:
+                supabase.table("listing_lifecycle").update({
+                    "status": "ACTIVE",
+                    "consecutive_missing_days": 0,
+                    "last_seen_at": datetime.now().isoformat(),
+                    "ended_at": None
+                }).eq("listing_id", listing_id).execute()
+                reactivated += 1
+            except Exception as e:
+                logger.warning(f"  Failed to reactivate {listing_id}: {e}")
+        logger.info(f"  ✅ Reactivated {reactivated} listings")
 
     # Step 5: Process MISSING listings
     logger.info(f"\n❓ Step 5: Processing {len(missing_ids)} missing listings")
