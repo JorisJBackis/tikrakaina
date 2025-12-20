@@ -649,7 +649,6 @@ export default function NotionStyleVersion() {
               >
                 <img src="/logo.png" alt="VilRent Logo" className="h-8 md:h-10 w-auto object-contain" />
                 <span className="text-xl md:text-2xl font-bold tracking-tight bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 bg-clip-text text-transparent" style={{ fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", letterSpacing: '-0.02em' }}>VilRent</span>
-                <span className="hidden md:inline text-xs bg-gray-100 px-2 py-1 rounded-md text-gray-600 font-medium">8 metų patirtis</span>
               </a>
               <nav className="hidden lg:flex items-center space-x-1">
                 <button
@@ -1303,7 +1302,7 @@ export default function NotionStyleVersion() {
                                     return (
                                   <div key={index} className="flex items-center gap-2">
                                     {/* Label with extracted value */}
-                                    <div className="min-w-fit text-xs text-right flex items-center justify-end gap-1 whitespace-nowrap">
+                                    <div className="w-36 text-xs text-right flex items-center justify-end gap-1">
                                       <span className="text-gray-700">{item.label}</span>
                                       {item.display_value && (
                                         <span className="text-gray-400">({item.display_value})</span>
