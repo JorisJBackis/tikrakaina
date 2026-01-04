@@ -123,10 +123,10 @@ def featurize_from_db(row, district_categories, feature_order):
     # Reorder to exact feature order
     df = df.reindex(columns=feature_order)
 
-    return df, dist_to_center
+    return df, dist_to_center, lat, lon
 
 
-def main(limit=1000, days=20):
+def main(limit=2000, days=12):
     print(f"Loading NEW model (same as production)...")
 
     with open('model_new.pkl', 'rb') as f:
@@ -189,7 +189,7 @@ def main(limit=1000, days=20):
         print(f"[{i+1}/{len(listings)}] {listing_id} ({district})...", end=" ", flush=True)
 
         try:
-            features_df, dist = featurize_from_db(row, district_categories, feature_order)
+            features_df, dist, lat, lon = featurize_from_db(row, district_categories, feature_order)
 
             pred_per_m2 = model.predict(features_df)[0]
             predicted_total = pred_per_m2 * area if area > 0 else 0
@@ -200,12 +200,20 @@ def main(limit=1000, days=20):
                     'listing_id': listing_id,
                     'url': row.get('url', ''),
                     'district': district,
+                    'street': row.get('street', ''),
                     'rooms': int(row.get('rooms', 0) or 0),
                     'area_m2': area,
+                    'floor_current': int(row.get('floor_current', 0) or 0),
+                    'floor_total': int(row.get('floor_total', 0) or 0),
+                    'year_built': int(row.get('year_built', 0) or 0),
                     'actual_price': actual_price,
                     'predicted_price': round(predicted_total),
                     'pred_per_m2': round(pred_per_m2, 2),
                     'deal_score': round(deal_score, 1),
+                    'latitude': lat,
+                    'longitude': lon,
+                    'dist_to_center_km': round(dist, 3) if dist else None,
+                    'first_seen_at': row.get('first_seen_at'),
                 })
                 print(f"€{actual_price} vs €{round(predicted_total)} ({deal_score:+.1f}%)")
             else:
@@ -247,24 +255,61 @@ def main(limit=1000, days=20):
                   f"{r['rooms']}r/{r['area_m2']:.0f}m²  {r['district']}")
             print(f"    {r['url']}")
 
-    # Save results to JSON
+    # Save results to JSON (backup)
     output_file = 'best_deals_results.json'
     with open(output_file, 'w') as f:
         json.dump({
             'generated_at': datetime.now().isoformat(),
+            'days_analyzed': days,
             'total_listings': total,
             'good_deals_count': len(good_deals),
             'top_5_pct': results[:top_5_pct],
             'top_10_pct': results[:top_10_pct],
             'all_results': results
-        }, f, indent=2)
+        }, f, indent=2, default=str)
     print(f"\nResults saved to {output_file}")
+
+    # Save to database
+    print(f"\nSaving {len(results)} results to database...")
+    save_to_database(supabase, results)
 
     return results
 
 
+def save_to_database(supabase, results):
+    """Save deal analysis results to Supabase."""
+    run_id = datetime.now().strftime('%Y%m%d_%H%M%S')
+
+    for r in results:
+        try:
+            supabase.from_('deal_analysis').upsert({
+                'listing_id': r['listing_id'],
+                'run_id': run_id,
+                'url': r['url'],
+                'district': r['district'],
+                'street': r.get('street'),
+                'rooms': r['rooms'],
+                'area_m2': r['area_m2'],
+                'floor_current': r.get('floor_current'),
+                'floor_total': r.get('floor_total'),
+                'year_built': r.get('year_built'),
+                'actual_price': r['actual_price'],
+                'predicted_price': r['predicted_price'],
+                'pred_per_m2': r['pred_per_m2'],
+                'deal_score': r['deal_score'],
+                'latitude': r.get('latitude'),
+                'longitude': r.get('longitude'),
+                'dist_to_center_km': r.get('dist_to_center_km'),
+                'analyzed_at': datetime.now().isoformat(),
+            }, on_conflict='listing_id').execute()
+        except Exception as e:
+            print(f"  Error saving {r['listing_id']}: {e}")
+
+    print(f"✓ Saved to deal_analysis table (run_id: {run_id})")
+
+
 if __name__ == "__main__":
     import sys
-    limit = int(sys.argv[1]) if len(sys.argv) > 1 else 1500
-    days = int(sys.argv[2]) if len(sys.argv) > 2 else 20
+    limit = int(sys.argv[1]) if len(sys.argv) > 1 else 2000
+    days = int(sys.argv[2]) if len(sys.argv) > 2 else 12
     main(limit=limit, days=days)
