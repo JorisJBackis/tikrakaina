@@ -413,22 +413,42 @@ def scrape_list_page(page: int) -> List[ListingBasic]:
             if not clean_url.endswith("/"):
                 clean_url += "/"
 
-            # Try to extract price from link text or parent
+            # Try to extract price from various sources
             price = None
-            price_text = link.get_text()
-            price_match = re.search(r"(\d[\d\s]*)\s*€", price_text)
-            if price_match:
-                price = parse_int(price_match.group(1).replace(" ", ""))
 
-            # Try to find price in parent element
-            if not price:
-                parent = link.find_parent(class_=re.compile(r"list|item|row", re.I))
-                if parent:
-                    price_elem = parent.find(string=re.compile(r"\d+\s*€"))
-                    if price_elem:
-                        price_match = re.search(r"(\d[\d\s]*)\s*€", str(price_elem))
-                        if price_match:
-                            price = parse_int(price_match.group(1).replace(" ", ""))
+            # Method 1: Look in ancestor elements for price patterns
+            # Go up the DOM tree to find the listing container
+            for ancestor in link.parents:
+                if ancestor.name in ['article', 'div', 'li', 'tr']:
+                    # Look for price in any text within this container
+                    ancestor_text = ancestor.get_text(" ", strip=True)
+                    # Match patterns like "500 €", "1 200 €", "500 €/mėn."
+                    price_match = re.search(r'(\d[\d\s]*)(?:\s*)€(?:/mėn\.?)?', ancestor_text)
+                    if price_match:
+                        price_str = price_match.group(1).replace(" ", "").replace("\xa0", "")
+                        price = parse_int(price_str)
+                        if price and price >= 50 and price <= 10000:  # Reasonable rent range
+                            break
+                        else:
+                            price = None  # Reset if outside range
+
+                    # Also look for elements with price-related classes
+                    if not price:
+                        price_elem = ancestor.find(class_=re.compile(r'price|kaina', re.I))
+                        if price_elem:
+                            price_text = price_elem.get_text(" ", strip=True)
+                            price_match = re.search(r'(\d[\d\s]*)(?:\s*)€', price_text)
+                            if price_match:
+                                price_str = price_match.group(1).replace(" ", "").replace("\xa0", "")
+                                price = parse_int(price_str)
+                                if price and price >= 50 and price <= 10000:
+                                    break
+                                else:
+                                    price = None
+
+                # Stop at reasonable container boundaries
+                if ancestor.name in ['body', 'main', 'section']:
+                    break
 
             listings.append(ListingBasic(
                 listing_id=listing_id,
