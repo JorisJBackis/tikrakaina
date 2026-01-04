@@ -146,30 +146,56 @@ def get_supabase() -> Client:
 # ZYTE API HELPERS
 # ============================================================================
 
-def zyte_fetch(url: str, timeout: int = 30) -> str:
-    """Fetch URL via Zyte API, bypassing Cloudflare."""
+def zyte_fetch(url: str, timeout: int = 30, max_retries: int = 3) -> str:
+    """Fetch URL via Zyte API, bypassing Cloudflare. Includes retry logic."""
     if not ZYTE_API_KEY:
         raise RuntimeError("ZYTE_API_KEY not set")
 
-    response = requests.post(
-        ZYTE_API_ENDPOINT,
-        auth=(ZYTE_API_KEY, ""),
-        json={
-            "url": url,
-            "httpResponseBody": True,
-            "followRedirect": True,
-        },
-        timeout=timeout
-    )
-    response.raise_for_status()
+    import time
+    last_error = None
 
-    data = response.json()
-    body_b64 = data.get("httpResponseBody", "")
+    for attempt in range(max_retries):
+        try:
+            response = requests.post(
+                ZYTE_API_ENDPOINT,
+                auth=(ZYTE_API_KEY, ""),
+                json={
+                    "url": url,
+                    "httpResponseBody": True,
+                    "followRedirect": True,
+                },
+                timeout=timeout
+            )
+            response.raise_for_status()
 
-    if not body_b64:
-        raise ValueError(f"No HTML content returned for {url}")
+            data = response.json()
+            body_b64 = data.get("httpResponseBody", "")
 
-    return b64decode(body_b64).decode("utf-8", errors="ignore")
+            if not body_b64:
+                raise ValueError(f"No HTML content returned for {url}")
+
+            return b64decode(body_b64).decode("utf-8", errors="ignore")
+
+        except requests.exceptions.HTTPError as e:
+            last_error = e
+            status_code = e.response.status_code if e.response else 0
+            # Retry on 421 (rate limit), 429 (too many requests), 5xx (server errors)
+            if status_code in [421, 429] or status_code >= 500:
+                wait_time = (attempt + 1) * 5  # 5s, 10s, 15s
+                logger.warning(f"  ⚠️ Zyte API error {status_code}, retrying in {wait_time}s (attempt {attempt + 1}/{max_retries})")
+                time.sleep(wait_time)
+                continue
+            raise  # Don't retry on 4xx errors (except 421, 429)
+        except Exception as e:
+            last_error = e
+            if attempt < max_retries - 1:
+                wait_time = (attempt + 1) * 5
+                logger.warning(f"  ⚠️ Zyte API error: {e}, retrying in {wait_time}s (attempt {attempt + 1}/{max_retries})")
+                time.sleep(wait_time)
+                continue
+            raise
+
+    raise last_error or RuntimeError(f"Failed to fetch {url} after {max_retries} attempts")
 
 
 # ============================================================================
@@ -607,6 +633,7 @@ def get_active_listing_ids(supabase: Client) -> set:
     result = supabase.table("listing_lifecycle") \
         .select("listing_id") \
         .eq("status", "ACTIVE") \
+        .limit(10000) \
         .execute()
 
     return {row["listing_id"] for row in result.data}
@@ -616,6 +643,7 @@ def get_all_listing_ids(supabase: Client) -> set:
     """Get ALL listing IDs from database (any status)."""
     result = supabase.table("listing_lifecycle") \
         .select("listing_id") \
+        .limit(10000) \
         .execute()
 
     return {row["listing_id"] for row in result.data}
@@ -626,6 +654,7 @@ def get_listing_prices(supabase: Client) -> Dict[int, int]:
     result = supabase.table("listing_lifecycle") \
         .select("listing_id, last_price") \
         .eq("status", "ACTIVE") \
+        .limit(10000) \
         .execute()
 
     return {row["listing_id"]: row["last_price"] for row in result.data}
@@ -636,6 +665,7 @@ def get_fingerprints(supabase: Client) -> Dict[str, int]:
     result = supabase.table("listing_lifecycle") \
         .select("listing_id, fingerprint_hash") \
         .not_.is_("fingerprint_hash", "null") \
+        .limit(10000) \
         .execute()
 
     return {row["fingerprint_hash"]: row["listing_id"] for row in result.data}
@@ -647,6 +677,7 @@ def get_phone_counts(supabase: Client) -> Dict[str, int]:
         .select("phone_normalized") \
         .eq("status", "ACTIVE") \
         .not_.is_("phone_normalized", "null") \
+        .limit(10000) \
         .execute()
 
     counts = {}
@@ -1071,6 +1102,19 @@ def run_daily_collection(test_mode: bool = False, bootstrap: bool = False):
     logger.info(f"  Total in DB: {len(db_all_ids)}")
     logger.info(f"  Active in DB: {len(db_active_ids)}")
 
+    # SCRAPE FAILURE PROTECTION
+    # If we found very few listings compared to what we expect, the scrape likely failed
+    # Don't mark everything as MISSING in this case
+    scrape_failed = False
+    if len(db_active_ids) > 100 and len(current_ids) < len(db_active_ids) * 0.5:
+        logger.error(f"⚠️ SCRAPE FAILURE DETECTED: Found only {len(current_ids)} listings but expected ~{len(db_active_ids)}")
+        logger.error("  Skipping MISSING processing to prevent false positives")
+        scrape_failed = True
+    elif len(current_ids) == 0 and len(db_active_ids) > 0:
+        logger.error("⚠️ SCRAPE FAILURE DETECTED: Found 0 listings - Zyte API likely failed")
+        logger.error("  Aborting to prevent data corruption")
+        raise RuntimeError("Scrape failed: 0 listings found. Check Zyte API status.")
+
     # Step 3: Calculate diffs
     # NEW = listings we've NEVER seen before (not in db_all_ids)
     # MISSING = was ACTIVE but no longer on site
@@ -1158,21 +1202,24 @@ def run_daily_collection(test_mode: bool = False, bootstrap: bool = False):
         logger.info(f"  ✅ Reactivated {reactivated} listings")
 
     # Step 5: Process MISSING listings
-    logger.info(f"\n❓ Step 5: Processing {len(missing_ids)} missing listings")
     ended_count = 0
+    if scrape_failed:
+        logger.info(f"\n❓ Step 5: SKIPPED - Scrape failure detected, not marking {len(missing_ids)} listings as missing")
+    else:
+        logger.info(f"\n❓ Step 5: Processing {len(missing_ids)} missing listings")
 
-    for listing_id in missing_ids:
-        missing_days = mark_lifecycle_missing(supabase, listing_id)
+        for listing_id in missing_ids:
+            missing_days = mark_lifecycle_missing(supabase, listing_id)
 
-        if missing_days >= MISSING_DAYS_THRESHOLD:
-            # Mark as ended
-            end_lifecycle(supabase, listing_id, "RENTED_INFERRED")
+            if missing_days >= MISSING_DAYS_THRESHOLD:
+                # Mark as ended
+                end_lifecycle(supabase, listing_id, "RENTED_INFERRED")
 
-            # Try to promote to verified
-            if promote_to_verified(supabase, listing_id):
-                ended_count += 1
+                # Try to promote to verified
+                if promote_to_verified(supabase, listing_id):
+                    ended_count += 1
 
-    logger.info(f"  ✅ Ended {ended_count} listings, promoted to verified")
+        logger.info(f"  ✅ Ended {ended_count} listings, promoted to verified")
 
     # Step 6: Check for price changes in EXISTING
     logger.info(f"\n💰 Step 6: Checking price changes in {len(existing_ids)} existing listings")
