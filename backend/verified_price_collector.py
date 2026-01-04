@@ -416,38 +416,42 @@ def scrape_list_page(page: int) -> List[ListingBasic]:
             # Try to extract price from list view for price change detection
             price = None
 
-            # Look for price in ancestor elements
+            # Find the parent row container first (list-row-v2 class)
+            # This is important because the price is in a sibling section, not an ancestor
+            row_container = None
             for ancestor in link.parents:
-                if ancestor.name in ['article', 'div', 'li', 'tr']:
-                    # Method 1: Look for elements with price-related classes
-                    price_elem = ancestor.find(class_=re.compile(r'list-item-price|item-price|price', re.I))
+                if ancestor.name == 'div' and ancestor.get('class'):
+                    classes = ancestor.get('class', [])
+                    if 'list-row-v2' in classes or 'object-row' in classes:
+                        row_container = ancestor
+                        break
+                if ancestor.name in ['body', 'main', 'section']:
+                    break
+
+            # Look for price within the row container
+            if row_container:
+                # Method 1: Look for the specific price class (list-item-price-v2)
+                price_elem = row_container.find(class_='list-item-price-v2')
+                if price_elem:
+                    price_text = price_elem.get_text(" ", strip=True)
+                    price_match = re.search(r'(\d[\d\s\xa0]*)(?:\s*)€', price_text)
+                    if price_match:
+                        price_str = re.sub(r'[\s\xa0]', '', price_match.group(1))
+                        price = parse_int(price_str)
+                        if not (price and 100 <= price <= 10000):
+                            price = None
+
+                # Method 2: Fallback to generic price class
+                if not price:
+                    price_elem = row_container.find(class_=re.compile(r'list-item-price|item-price', re.I))
                     if price_elem:
                         price_text = price_elem.get_text(" ", strip=True)
-                        price_match = re.search(r'^[\s]*(\d[\d\s\xa0]*)(?:\s*)€', price_text)
+                        price_match = re.search(r'(\d[\d\s\xa0]*)(?:\s*)€', price_text)
                         if price_match:
                             price_str = re.sub(r'[\s\xa0]', '', price_match.group(1))
                             price = parse_int(price_str)
-                            if price and 100 <= price <= 10000:
-                                break
-                            price = None
-
-                    # Method 2: Look for "€/mėn" pattern in child elements
-                    if not price:
-                        for elem in ancestor.find_all(['span', 'div', 'strong', 'b', 'td', 'p']):
-                            elem_text = elem.get_text(" ", strip=True)
-                            price_match = re.search(r'(\d[\d\s\xa0]*)(?:\s*)€\s*/\s*mėn', elem_text, re.I)
-                            if price_match:
-                                price_str = re.sub(r'[\s\xa0]', '', price_match.group(1))
-                                price = parse_int(price_str)
-                                if price and 100 <= price <= 10000:
-                                    break
+                            if not (price and 100 <= price <= 10000):
                                 price = None
-                        if price:
-                            break
-
-                # Stop at reasonable container boundaries
-                if ancestor.name in ['body', 'main', 'section']:
-                    break
 
             listings.append(ListingBasic(
                 listing_id=listing_id,
