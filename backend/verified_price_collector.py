@@ -466,7 +466,9 @@ def scrape_all_list_pages(max_pages: int = MAX_PAGES) -> List[ListingBasic]:
         import time
         time.sleep(0.5)
 
-    logger.info(f"Total listings found: {len(all_listings)}")
+    # Log price extraction stats
+    with_price = sum(1 for l in all_listings if l.price is not None)
+    logger.info(f"Total listings found: {len(all_listings)} ({with_price} with prices from list view)")
     return all_listings
 
 
@@ -1255,13 +1257,20 @@ def run_daily_collection(test_mode: bool = False, bootstrap: bool = False):
     # Step 6: Check for price changes in EXISTING
     logger.info(f"\n💰 Step 6: Checking price changes in {len(existing_ids)} existing listings")
     changed_count = 0
+    skipped_no_list_price = 0
+    skipped_no_db_price = 0
 
     for listing_id in existing_ids:
         basic = current_by_id[listing_id]
         old_price = db_prices.get(listing_id)
 
         # Skip if no price info
-        if basic.price is None or old_price is None:
+        if basic.price is None:
+            skipped_no_list_price += 1
+            update_lifecycle_seen(supabase, listing_id)
+            continue
+        if old_price is None:
+            skipped_no_db_price += 1
             update_lifecycle_seen(supabase, listing_id)
             continue
 
@@ -1274,6 +1283,10 @@ def run_daily_collection(test_mode: bool = False, bootstrap: bool = False):
             update_lifecycle_seen(supabase, listing_id)
 
     logger.info(f"  ✅ Found {changed_count} price changes")
+    if skipped_no_list_price > 0:
+        logger.warning(f"  ⚠️ Skipped {skipped_no_list_price} listings (no price in list view)")
+    if skipped_no_db_price > 0:
+        logger.warning(f"  ⚠️ Skipped {skipped_no_db_price} listings (no price in database)")
 
     # Summary
     logger.info("\n" + "=" * 60)
