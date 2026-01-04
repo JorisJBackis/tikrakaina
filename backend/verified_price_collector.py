@@ -628,60 +628,91 @@ def scrape_detail_page(url: str) -> Optional[ListingFull]:
 # DATABASE OPERATIONS
 # ============================================================================
 
+def paginated_query(supabase: Client, table: str, select: str, filters: dict = None, page_size: int = 1000) -> list:
+    """Fetch all rows with pagination to bypass Supabase 1000-row limit."""
+    all_data = []
+    offset = 0
+
+    while True:
+        query = supabase.table(table).select(select)
+
+        # Apply filters
+        if filters:
+            for key, value in filters.items():
+                if key == "eq":
+                    for col, val in value.items():
+                        query = query.eq(col, val)
+                elif key == "not_null":
+                    for col in value:
+                        query = query.not_.is_(col, "null")
+
+        query = query.range(offset, offset + page_size - 1)
+        result = query.execute()
+
+        if not result.data:
+            break
+
+        all_data.extend(result.data)
+
+        # If we got fewer rows than page_size, we've reached the end
+        if len(result.data) < page_size:
+            break
+
+        offset += page_size
+
+    return all_data
+
+
 def get_active_listing_ids(supabase: Client) -> set:
     """Get all currently active listing IDs from database."""
-    result = supabase.table("listing_lifecycle") \
-        .select("listing_id") \
-        .eq("status", "ACTIVE") \
-        .limit(10000) \
-        .execute()
-
-    return {row["listing_id"] for row in result.data}
+    data = paginated_query(
+        supabase,
+        "listing_lifecycle",
+        "listing_id",
+        filters={"eq": {"status": "ACTIVE"}}
+    )
+    return {row["listing_id"] for row in data}
 
 
 def get_all_listing_ids(supabase: Client) -> set:
     """Get ALL listing IDs from database (any status)."""
-    result = supabase.table("listing_lifecycle") \
-        .select("listing_id") \
-        .limit(10000) \
-        .execute()
-
-    return {row["listing_id"] for row in result.data}
+    data = paginated_query(supabase, "listing_lifecycle", "listing_id")
+    return {row["listing_id"] for row in data}
 
 
 def get_listing_prices(supabase: Client) -> Dict[int, int]:
     """Get last known prices for active listings."""
-    result = supabase.table("listing_lifecycle") \
-        .select("listing_id, last_price") \
-        .eq("status", "ACTIVE") \
-        .limit(10000) \
-        .execute()
-
-    return {row["listing_id"]: row["last_price"] for row in result.data}
+    data = paginated_query(
+        supabase,
+        "listing_lifecycle",
+        "listing_id, last_price",
+        filters={"eq": {"status": "ACTIVE"}}
+    )
+    return {row["listing_id"]: row["last_price"] for row in data}
 
 
 def get_fingerprints(supabase: Client) -> Dict[str, int]:
     """Get fingerprint -> listing_id mapping for repost detection."""
-    result = supabase.table("listing_lifecycle") \
-        .select("listing_id, fingerprint_hash") \
-        .not_.is_("fingerprint_hash", "null") \
-        .limit(10000) \
-        .execute()
-
-    return {row["fingerprint_hash"]: row["listing_id"] for row in result.data}
+    data = paginated_query(
+        supabase,
+        "listing_lifecycle",
+        "listing_id, fingerprint_hash",
+        filters={"not_null": ["fingerprint_hash"]}
+    )
+    return {row["fingerprint_hash"]: row["listing_id"] for row in data}
 
 
 def get_phone_counts(supabase: Client) -> Dict[str, int]:
     """Get phone number -> count of active listings."""
-    result = supabase.table("listing_lifecycle") \
-        .select("phone_normalized") \
-        .eq("status", "ACTIVE") \
-        .not_.is_("phone_normalized", "null") \
-        .limit(10000) \
-        .execute()
+    data = paginated_query(
+        supabase,
+        "listing_lifecycle",
+        "phone_normalized",
+        filters={"eq": {"status": "ACTIVE"}, "not_null": ["phone_normalized"]}
+    )
 
     counts = {}
-    for row in result.data:
+    for row in data:
         phone = row["phone_normalized"]
         counts[phone] = counts.get(phone, 0) + 1
 
