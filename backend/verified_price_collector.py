@@ -413,41 +413,35 @@ def scrape_list_page(page: int) -> List[ListingBasic]:
             if not clean_url.endswith("/"):
                 clean_url += "/"
 
-            # Try to extract price from list view
-            # Note: List view price extraction is unreliable, so we only use it for
-            # detecting significant price changes. The detail page price is authoritative.
+            # Try to extract price from list view for price change detection
             price = None
 
-            # Look for price elements with specific classes used by Aruodas
+            # Look for price in ancestor elements
             for ancestor in link.parents:
                 if ancestor.name in ['article', 'div', 'li', 'tr']:
-                    # Method 1: Look for specific price element classes
+                    # Method 1: Look for elements with price-related classes
                     price_elem = ancestor.find(class_=re.compile(r'list-item-price|item-price|price', re.I))
                     if price_elem:
                         price_text = price_elem.get_text(" ", strip=True)
-                        # Match price pattern at the start of text (to avoid matching random numbers)
-                        price_match = re.search(r'^[\s]*(\d[\d\s]*)(?:\s*)€', price_text)
+                        price_match = re.search(r'^[\s]*(\d[\d\s\xa0]*)(?:\s*)€', price_text)
                         if price_match:
-                            price_str = price_match.group(1).replace(" ", "").replace("\xa0", "")
+                            price_str = re.sub(r'[\s\xa0]', '', price_match.group(1))
                             price = parse_int(price_str)
-                            if price and 100 <= price <= 10000:  # Reasonable rent range
+                            if price and 100 <= price <= 10000:
                                 break
-                            else:
-                                price = None
+                            price = None
 
-                    # Method 2: Look for text containing "€/mėn" (per month) pattern
+                    # Method 2: Look for "€/mėn" pattern in child elements
                     if not price:
-                        for elem in ancestor.find_all(['span', 'div', 'p', 'td']):
+                        for elem in ancestor.find_all(['span', 'div', 'strong', 'b', 'td', 'p']):
                             elem_text = elem.get_text(" ", strip=True)
-                            # Specifically match monthly rent format: "XXX €/mėn."
-                            price_match = re.search(r'(\d[\d\s]*)(?:\s*)€\s*/\s*mėn', elem_text, re.I)
+                            price_match = re.search(r'(\d[\d\s\xa0]*)(?:\s*)€\s*/\s*mėn', elem_text, re.I)
                             if price_match:
-                                price_str = price_match.group(1).replace(" ", "").replace("\xa0", "")
+                                price_str = re.sub(r'[\s\xa0]', '', price_match.group(1))
                                 price = parse_int(price_str)
                                 if price and 100 <= price <= 10000:
                                     break
-                                else:
-                                    price = None
+                                price = None
                         if price:
                             break
 
@@ -493,7 +487,13 @@ def scrape_all_list_pages(max_pages: int = MAX_PAGES) -> List[ListingBasic]:
 
     # Log price extraction stats
     with_price = sum(1 for l in all_listings if l.price is not None)
+    without_price = [l for l in all_listings if l.price is None]
     logger.info(f"Total listings found: {len(all_listings)} ({with_price} with prices from list view)")
+
+    # Log first few listings without prices for debugging
+    if without_price and len(without_price) <= 10:
+        logger.warning(f"  Listings without prices: {[l.listing_id for l in without_price]}")
+
     return all_listings
 
 
