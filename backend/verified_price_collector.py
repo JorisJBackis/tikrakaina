@@ -608,6 +608,13 @@ def scrape_detail_page(url: str) -> Optional[ListingFull]:
         desc_elem = soup.find(id="collapsedText") or soup.find(class_="obj-comment")
         description = desc_elem.get_text(strip=True) if desc_elem else None
 
+        # Extract image URLs from CDN
+        all_imgs = soup.find_all('img')
+        image_urls = [
+            img.get('src') for img in all_imgs
+            if img.get('src') and 'aruodas-img.dgn.lt/object' in img.get('src', '')
+        ]
+
         # Build raw features for ML
         raw_features = {
             "area_m2": area_m2,
@@ -624,6 +631,7 @@ def scrape_detail_page(url: str) -> Optional[ListingFull]:
             "building_type": first("Pastato tipas"),
             "condition": first("Įrengimas"),
             "description": description,
+            "image_urls": image_urls,
         }
 
         # Calculate fingerprint
