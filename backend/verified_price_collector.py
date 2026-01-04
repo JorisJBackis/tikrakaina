@@ -613,6 +613,7 @@ def scrape_detail_page(url: str) -> Optional[ListingFull]:
             "year_built": year_built,
             "district": district,
             "street": street,
+            "house_number": first("Namo numeris"),  # For precise geocoding
             "heating": details.get("Šildymas", []),
             "features": details.get("Ypatybės", []),
             "additional_rooms": details.get("Papildomos patalpos", []),
