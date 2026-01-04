@@ -604,6 +604,10 @@ def scrape_detail_page(url: str) -> Optional[ListingFull]:
         # Broker detection from HTML content
         is_broker, broker_score = detect_broker_from_html(soup)
 
+        # Extract description text
+        desc_elem = soup.find(id="collapsedText") or soup.find(class_="obj-comment")
+        description = desc_elem.get_text(strip=True) if desc_elem else None
+
         # Build raw features for ML
         raw_features = {
             "area_m2": area_m2,
@@ -619,6 +623,7 @@ def scrape_detail_page(url: str) -> Optional[ListingFull]:
             "additional_rooms": details.get("Papildomos patalpos", []),
             "building_type": first("Pastato tipas"),
             "condition": first("Įrengimas"),
+            "description": description,
         }
 
         # Calculate fingerprint
