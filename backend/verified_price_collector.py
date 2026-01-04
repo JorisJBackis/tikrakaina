@@ -608,12 +608,23 @@ def scrape_detail_page(url: str) -> Optional[ListingFull]:
         desc_elem = soup.find(id="collapsedText") or soup.find(class_="obj-comment")
         description = desc_elem.get_text(strip=True) if desc_elem else None
 
-        # Extract image URLs from CDN
-        all_imgs = soup.find_all('img')
-        image_urls = [
-            img.get('src') for img in all_imgs
-            if img.get('src') and 'aruodas-img.dgn.lt/object' in img.get('src', '')
-        ]
+        # Extract full-size image URLs from CDN (object_62_ = full, object_63_ = thumbnail)
+        # Get from <a href> links which have full-size versions
+        image_urls = []
+        for a in soup.find_all('a', href=True):
+            href = a.get('href', '')
+            if 'aruodas-img.dgn.lt/object_62_' in href:
+                if href not in image_urls:
+                    image_urls.append(href)
+
+        # Fallback to img src if no links found, converting to full-size
+        if not image_urls:
+            for img in soup.find_all('img'):
+                src = img.get('src', '')
+                if 'aruodas-img.dgn.lt/object' in src:
+                    full_src = src.replace('object_63_', 'object_62_')
+                    if full_src not in image_urls:
+                        image_urls.append(full_src)
 
         # Build raw features for ML
         raw_features = {
