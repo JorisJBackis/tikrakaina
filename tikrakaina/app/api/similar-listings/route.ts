@@ -41,6 +41,7 @@ interface ValidatedListing {
   rooms: number
   area_m2: number
   actual_price: number
+  predicted_price: number | null
   validation_tier: string
   validation_confidence: number
   validation_summary: string
@@ -119,6 +120,7 @@ export async function POST(request: NextRequest) {
           rooms,
           area_m2,
           actual_price,
+          predicted_price,
           validation_tier,
           validation_confidence,
           validation_summary,

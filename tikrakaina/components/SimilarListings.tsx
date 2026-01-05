@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Home, Check, Lock, Star, ArrowRight, BadgeCheck, ShieldCheck } from 'lucide-react'
+import { Home, Lock, ArrowRight, BadgeCheck, ShieldCheck, TrendingDown } from 'lucide-react'
 
 interface ValidatedListing {
   listing_id: number
@@ -10,6 +10,7 @@ interface ValidatedListing {
   rooms: number
   area_m2: number
   actual_price: number
+  predicted_price: number | null
   validation_tier: string
   validation_confidence: number
   validation_summary: string
@@ -107,11 +108,11 @@ export function SimilarListings({
   const visibleCount = isAuthenticated ? 4 : 2
 
   return (
-    <div className="mt-8 space-y-4">
+    <div className="mt-4 space-y-3">
       {/* Section Header */}
       <div className="text-center">
         <h3 className="text-lg font-semibold text-white">
-          Panašūs patvirtinti pasiūlymai
+          Panašūs geriausi pasiūlymai
         </h3>
       </div>
 
@@ -148,9 +149,8 @@ export function SimilarListings({
 
                 {/* Locked Overlay */}
                 {isLocked && (
-                  <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center">
-                    <Lock className="w-5 h-5 text-white/80 mb-1" />
-                    <span className="text-white text-xs font-medium">+{listings.length - visibleCount} pasiūlymai</span>
+                  <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                    <Lock className="w-6 h-6 text-white/80" />
                   </div>
                 )}
               </div>
@@ -165,23 +165,23 @@ export function SimilarListings({
 
                 {/* Details */}
                 <div className="flex items-center gap-2 text-white/70 text-xs">
-                  <span>{listing.rooms}k</span>
+                  <span>{listing.rooms} kamb.</span>
                   <span className="text-white/40">•</span>
                   <span>{listing.area_m2}m²</span>
                 </div>
 
-                {/* Price */}
-                <div className="text-green-400 font-bold">
-                  €{listing.actual_price}/mėn
+                {/* Price with discount */}
+                <div className="flex items-center gap-2">
+                  <span className="text-green-400 font-bold">
+                    €{listing.actual_price}/mėn
+                  </span>
+                  {!isLocked && listing.predicted_price && listing.predicted_price > listing.actual_price && (
+                    <span className="flex items-center gap-0.5 text-[10px] font-semibold text-green-400 bg-green-400/20 px-1.5 py-0.5 rounded">
+                      <TrendingDown className="w-3 h-3" />
+                      -{Math.round((1 - listing.actual_price / listing.predicted_price) * 100)}%
+                    </span>
+                  )}
                 </div>
-
-                {/* Confidence Score */}
-                {!isLocked && (
-                  <div className="flex items-center gap-1 text-xs text-white/50">
-                    <Star className="w-3 h-3 fill-current" />
-                    <span>{listing.validation_confidence}% patikimumas</span>
-                  </div>
-                )}
               </div>
 
               {/* View Button (only visible ones) */}
@@ -204,14 +204,14 @@ export function SimilarListings({
 
       {/* CTA for non-authenticated users */}
       {!isAuthenticated && listings.length > 2 && (
-        <div className="bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-xl p-3 text-center space-y-2">
+        <div className="bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-xl p-4 text-center space-y-3">
           <p className="text-white font-medium flex items-center justify-center gap-2">
             <Lock className="w-4 h-4" />
             Prisijunk ir pamatyk visus geriausius sandorius
           </p>
           <button
             onClick={onRegister}
-            className="bg-gradient-to-r from-blue-500 to-purple-500 text-white font-semibold py-2 px-5 rounded-xl hover:from-blue-600 hover:to-purple-600 transition-all"
+            className="bg-gradient-to-r from-blue-500 to-purple-500 text-white font-semibold py-2.5 px-8 rounded-xl hover:from-blue-600 hover:to-purple-600 transition-all"
           >
             Registruotis nemokamai
           </button>
