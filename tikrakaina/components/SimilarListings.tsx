@@ -158,9 +158,9 @@ export function SimilarListings({
               {/* Content */}
               <div className={`p-3 space-y-1 ${isLocked ? 'blur-sm' : ''}`}>
                 {/* Location */}
-                <div className="text-white font-medium text-sm truncate">
-                  {listing.district}
-                  {listing.street && <span className="text-white/60">, {listing.street}</span>}
+                <div className="text-white font-medium text-sm">
+                  <div>{listing.district}</div>
+                  {listing.street && <div className="text-white/60 text-xs truncate">{listing.street}</div>}
                 </div>
 
                 {/* Details */}
