@@ -220,7 +220,7 @@ export function SimilarListings({
       {/* Summary for authenticated users */}
       {isAuthenticated && (
         <div className="text-center text-white/50 text-xs">
-          Rasta {listings.length} panašūs patvirtinti pasiūlymai
+          Rasti {listings.length} panašūs patvirtinti pasiūlymai
         </div>
       )}
     </div>
