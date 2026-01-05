@@ -484,7 +484,8 @@ export default function NotionStyleVersion() {
   const endpoint = inputMethod === "url" ? "/api/predict" : "/api/predict-manual";
 
   // Normalize mobile URLs to desktop URLs (m.aruodas.lt -> www.aruodas.lt)
-  const normalizedUrl = url.replace(/\/\/m\.aruodas\.lt\//g, '//www.aruodas.lt/');
+  // Normalize ANY subdomain (m., en., m.en., m.lt., etc.) to www.
+const normalizedUrl = url.replace(/\/\/(?:[a-z]+\.)*aruodas\.lt\//g, '//www.aruodas.lt/');
 
   // Build request body
   const requestBody =
