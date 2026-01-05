@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Home, Lock, ArrowRight, BadgeCheck, ShieldCheck, TrendingDown } from 'lucide-react'
+import { Home, Lock, ArrowRight, BadgeCheck, ShieldCheck } from 'lucide-react'
 
 interface ValidatedListing {
   listing_id: number
@@ -170,18 +170,17 @@ export function SimilarListings({
                   <span>{listing.area_m2}m²</span>
                 </div>
 
-                {/* Price with discount */}
-                <div className="flex items-center gap-2">
-                  <span className="text-green-400 font-bold">
-                    €{listing.actual_price}/mėn
-                  </span>
-                  {!isLocked && listing.predicted_price && listing.predicted_price > listing.actual_price && (
-                    <span className="flex items-center gap-0.5 text-[10px] font-semibold text-green-400 bg-green-400/20 px-1.5 py-0.5 rounded">
-                      <TrendingDown className="w-3 h-3" />
-                      -{Math.round((1 - listing.actual_price / listing.predicted_price) * 100)}%
-                    </span>
-                  )}
+                {/* Price */}
+                <div className="text-green-400 font-bold">
+                  €{listing.actual_price}/mėn
                 </div>
+
+                {/* Discount from market value */}
+                {!isLocked && listing.predicted_price && listing.predicted_price > listing.actual_price && (
+                  <div className="text-xs text-green-400">
+                    {Math.round((1 - listing.actual_price / listing.predicted_price) * 100)}% pigiau nei rinkos vertė
+                  </div>
+                )}
               </div>
 
               {/* View Button (only visible ones) */}
