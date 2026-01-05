@@ -13,6 +13,7 @@ import BuyCreditsModal from '@/components/BuyCreditsModal'
 import UserCredits from '@/components/UserCredits'
 import Footer from '@/components/Footer'
 import VilniusMap from '@/components/VilniusMap'
+import { SimilarListings } from '@/components/SimilarListings'
 import { extractDistrictWithOverrides, type DistrictExtractionResult } from '@/lib/districtExtractor'
 
 // Merged Version 4: Notion-Style Clean (Lithuanian)
@@ -1469,6 +1470,20 @@ export default function NotionStyleVersion() {
                           </div>
                         </div>
                       </div>
+
+                      {/* Similar Validated Listings */}
+                      {result && selectedAddressData?.district && (
+                        <div className="bg-gray-900 rounded-xl p-4 mt-6">
+                          <SimilarListings
+                            district={selectedAddressData.district}
+                            rooms={parseInt(manualData.rooms) || 2}
+                            area_m2={parseFloat(manualData.area_m2) || 50}
+                            price={Math.round(result.total_price)}
+                            onRegister={() => setShowAuthModal(true)}
+                            isAuthenticated={!!user}
+                          />
+                        </div>
+                      )}
 
                       <div>
                         <button
