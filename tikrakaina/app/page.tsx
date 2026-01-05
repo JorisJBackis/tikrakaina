@@ -1434,12 +1434,28 @@ export default function NotionStyleVersion() {
                       )}
 
                       {/* Similar Validated Listings */}
-                      {result && (selectedAddressData?.district || result.features?.district_encoded) && (
+                      {result && (
+                        inputMethod === 'manual'
+                          ? selectedAddressData?.district
+                          : result.features?.district_encoded
+                      ) && (
                         <div className="bg-gray-900 rounded-xl p-4">
                           <SimilarListings
-                            district={selectedAddressData?.district || result.features?.district_encoded || ''}
-                            rooms={parseInt(manualData.rooms) || result.features?.rooms || 2}
-                            area_m2={parseFloat(manualData.area_m2) || result.features?.area_m2 || result.area_m2 || 50}
+                            district={
+                              inputMethod === 'manual'
+                                ? selectedAddressData?.district || ''
+                                : result.features?.district_encoded || ''
+                            }
+                            rooms={
+                              inputMethod === 'manual'
+                                ? parseInt(manualData.rooms) || 2
+                                : result.features?.rooms || 2
+                            }
+                            area_m2={
+                              inputMethod === 'manual'
+                                ? parseFloat(manualData.area_m2) || 50
+                                : result.features?.area_m2 || result.area_m2 || 50
+                            }
                             price={Math.round(result.total_price)}
                             onRegister={() => setShowAuthModal(true)}
                             isAuthenticated={!!user}
