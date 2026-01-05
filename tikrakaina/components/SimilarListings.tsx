@@ -109,13 +109,10 @@ export function SimilarListings({
   return (
     <div className="mt-8 space-y-4">
       {/* Section Header */}
-      <div className="text-center space-y-1">
-        <h3 className="text-lg font-semibold text-white flex items-center justify-center gap-2">
+      <div className="text-center">
+        <h3 className="text-lg font-semibold text-white">
           Panašūs patvirtinti pasiūlymai
         </h3>
-        <p className="text-white/60 text-sm">
-          Mūsų ekspertų patikrinti skelbimai pagal jūsų paiešką
-        </p>
       </div>
 
       {/* Listings Grid */}
@@ -207,19 +204,14 @@ export function SimilarListings({
 
       {/* CTA for non-authenticated users */}
       {!isAuthenticated && listings.length > 2 && (
-        <div className="bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-xl p-4 text-center space-y-3">
-          <div className="space-y-1">
-            <p className="text-white font-medium flex items-center justify-center gap-2">
-              <Lock className="w-4 h-4" />
-              Prisijunk ir pamatyk visus {listings.length} patvirtintus sandorius
-            </p>
-            <p className="text-white/60 text-sm">
-              Mūsų ekspertų patikrinti ir įvertinti butai
-            </p>
-          </div>
+        <div className="bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-xl p-3 text-center space-y-2">
+          <p className="text-white font-medium flex items-center justify-center gap-2">
+            <Lock className="w-4 h-4" />
+            Prisijunk ir pamatyk visus geriausius sandorius
+          </p>
           <button
             onClick={onRegister}
-            className="bg-gradient-to-r from-blue-500 to-purple-500 text-white font-semibold py-2.5 px-6 rounded-xl hover:from-blue-600 hover:to-purple-600 transition-all"
+            className="bg-gradient-to-r from-blue-500 to-purple-500 text-white font-semibold py-2 px-5 rounded-xl hover:from-blue-600 hover:to-purple-600 transition-all"
           >
             Registruotis nemokamai
           </button>

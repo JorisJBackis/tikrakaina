@@ -1433,6 +1433,20 @@ export default function NotionStyleVersion() {
                         </div>
                       )}
 
+                      {/* Similar Validated Listings */}
+                      {result && selectedAddressData?.district && (
+                        <div className="bg-gray-900 rounded-xl p-4">
+                          <SimilarListings
+                            district={selectedAddressData.district}
+                            rooms={parseInt(manualData.rooms) || 2}
+                            area_m2={parseFloat(manualData.area_m2) || 50}
+                            price={Math.round(result.total_price)}
+                            onRegister={() => setShowAuthModal(true)}
+                            isAuthenticated={!!user}
+                          />
+                        </div>
+                      )}
+
                       <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 md:p-4">
                         <div className="flex items-start space-x-2 md:space-x-3">
                           <Bell className="h-4 w-4 md:h-5 md:w-5 text-blue-600 mt-0.5 flex-shrink-0" />
@@ -1470,20 +1484,6 @@ export default function NotionStyleVersion() {
                           </div>
                         </div>
                       </div>
-
-                      {/* Similar Validated Listings */}
-                      {result && selectedAddressData?.district && (
-                        <div className="bg-gray-900 rounded-xl p-4 mt-6">
-                          <SimilarListings
-                            district={selectedAddressData.district}
-                            rooms={parseInt(manualData.rooms) || 2}
-                            area_m2={parseFloat(manualData.area_m2) || 50}
-                            price={Math.round(result.total_price)}
-                            onRegister={() => setShowAuthModal(true)}
-                            isAuthenticated={!!user}
-                          />
-                        </div>
-                      )}
 
                       <div>
                         <button
