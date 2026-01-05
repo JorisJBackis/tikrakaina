@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import Image from 'next/image'
+import { Home, Check, Lock, Star, ArrowRight, BadgeCheck, ShieldCheck } from 'lucide-react'
 
 interface ValidatedListing {
   listing_id: number
@@ -84,20 +84,22 @@ export function SimilarListings({
   }
 
   if (error || listings.length === 0) {
-    return null // Don't show section if no listings
+    return null
   }
 
   const getTierBadge = (tier: string) => {
     if (tier === 'PATVIRTINTAS') {
       return (
-        <span className="absolute top-2 left-2 bg-green-500 text-white text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1">
-          <span>&#10003;</span> PATVIRTINTAS
+        <span className="absolute top-2 left-2 bg-green-500 text-white text-[10px] font-semibold px-2 py-1 rounded-full flex items-center gap-1">
+          <ShieldCheck className="w-3 h-3" />
+          PATVIRTINTAS
         </span>
       )
     }
     return (
-      <span className="absolute top-2 left-2 bg-blue-500 text-white text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1">
-        <span>&#10003;</span> GERAS
+      <span className="absolute top-2 left-2 bg-blue-500 text-white text-[10px] font-semibold px-2 py-1 rounded-full flex items-center gap-1">
+        <BadgeCheck className="w-3 h-3" />
+        GERAS
       </span>
     )
   }
@@ -109,7 +111,7 @@ export function SimilarListings({
       {/* Section Header */}
       <div className="text-center space-y-1">
         <h3 className="text-lg font-semibold text-white flex items-center justify-center gap-2">
-          <span>&#127968;</span> Panašūs patvirtinti pasiūlymai
+          Panašūs patvirtinti pasiūlymai
         </h3>
         <p className="text-white/60 text-sm">
           Mūsų ekspertų patikrinti skelbimai pagal jūsų paiešką
@@ -140,7 +142,7 @@ export function SimilarListings({
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-white/30">
-                    <span className="text-3xl">&#127968;</span>
+                    <Home className="w-8 h-8" />
                   </div>
                 )}
 
@@ -150,7 +152,7 @@ export function SimilarListings({
                 {/* Locked Overlay */}
                 {isLocked && (
                   <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center">
-                    <span className="text-2xl mb-1">&#128274;</span>
+                    <Lock className="w-5 h-5 text-white/80 mb-1" />
                     <span className="text-white text-xs font-medium">+{listings.length - visibleCount} pasiūlymai</span>
                   </div>
                 )}
@@ -167,7 +169,7 @@ export function SimilarListings({
                 {/* Details */}
                 <div className="flex items-center gap-2 text-white/70 text-xs">
                   <span>{listing.rooms}k</span>
-                  <span>•</span>
+                  <span className="text-white/40">•</span>
                   <span>{listing.area_m2}m²</span>
                 </div>
 
@@ -179,7 +181,7 @@ export function SimilarListings({
                 {/* Confidence Score */}
                 {!isLocked && (
                   <div className="flex items-center gap-1 text-xs text-white/50">
-                    <span>&#9733;</span>
+                    <Star className="w-3 h-3 fill-current" />
                     <span>{listing.validation_confidence}% patikimumas</span>
                   </div>
                 )}
@@ -191,10 +193,11 @@ export function SimilarListings({
                   href={listing.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="block mx-3 mb-3 text-center bg-white/10 hover:bg-white/20 text-white text-xs py-2 px-3 rounded-lg transition-colors"
+                  className="flex items-center justify-center gap-1 mx-3 mb-3 bg-white/10 hover:bg-white/20 text-white text-xs py-2 px-3 rounded-lg transition-colors"
                   onClick={e => e.stopPropagation()}
                 >
-                  Žiūrėti skelbimą &#8594;
+                  Žiūrėti skelbimą
+                  <ArrowRight className="w-3 h-3" />
                 </a>
               )}
             </div>
@@ -206,8 +209,9 @@ export function SimilarListings({
       {!isAuthenticated && listings.length > 2 && (
         <div className="bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-xl p-4 text-center space-y-3">
           <div className="space-y-1">
-            <p className="text-white font-medium">
-              &#128273; Prisijunk ir pamatyk visus {listings.length} patvirtintus sandorius
+            <p className="text-white font-medium flex items-center justify-center gap-2">
+              <Lock className="w-4 h-4" />
+              Prisijunk ir pamatyk visus {listings.length} patvirtintus sandorius
             </p>
             <p className="text-white/60 text-sm">
               Mūsų ekspertų patikrinti ir įvertinti butai
