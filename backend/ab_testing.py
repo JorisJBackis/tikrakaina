@@ -312,10 +312,14 @@ async def run_dual_prediction(
     }
     """
 
-    # Normalize mobile URLs to desktop URLs
-    if "//m.aruodas.lt/" in url:
-        url = url.replace("//m.aruodas.lt/", "//www.aruodas.lt/")
-        logger.info(f"📱 Normalized mobile URL to: {url}")
+    # Normalize mobile/English URLs to standard desktop URLs
+    # Handles: m.aruodas.lt, en.aruodas.lt, m.en.aruodas.lt -> www.aruodas.lt
+    original_url = url
+    url = url.replace("//m.en.aruodas.lt/", "//www.aruodas.lt/")
+    url = url.replace("//en.aruodas.lt/", "//www.aruodas.lt/")
+    url = url.replace("//m.aruodas.lt/", "//www.aruodas.lt/")
+    if url != original_url:
+        logger.info(f"📱 Normalized URL to: {url}")
 
     result = {
         "success": False,

@@ -184,10 +184,14 @@ async def predict(request: PredictionRequest):
 
     url_str = str(request.url)
 
-    # Normalize mobile URLs to desktop URLs (m.aruodas.lt -> www.aruodas.lt)
-    if "//m.aruodas.lt/" in url_str:
-        url_str = url_str.replace("//m.aruodas.lt/", "//www.aruodas.lt/")
-        logger.info(f"📱 Normalized mobile URL to: {url_str}")
+    # Normalize mobile/English URLs to standard desktop URLs
+    # Handles: m.aruodas.lt, en.aruodas.lt, m.en.aruodas.lt -> www.aruodas.lt
+    original_url = url_str
+    url_str = url_str.replace("//m.en.aruodas.lt/", "//www.aruodas.lt/")
+    url_str = url_str.replace("//en.aruodas.lt/", "//www.aruodas.lt/")
+    url_str = url_str.replace("//m.aruodas.lt/", "//www.aruodas.lt/")
+    if url_str != original_url:
+        logger.info(f"📱 Normalized URL to: {url_str}")
 
     # Check if URL is from aruodas.lt
     if "aruodas.lt" not in url_str:

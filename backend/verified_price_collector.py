@@ -48,7 +48,7 @@ BASE_DETAIL_URL = "https://www.aruodas.lt"
 # Scraping config
 MAX_PAGES = 100  # Safety limit
 LISTINGS_PER_PAGE = 25
-MISSING_DAYS_THRESHOLD = 3  # Days before marking as ENDED
+MISSING_DAYS_THRESHOLD = 2  # Calendar days since last seen before marking as ENDED
 MAX_LISTING_AGE_DAYS = 40  # Skip listings older than this (stale/overpriced)
 
 # HTML-based broker detection patterns (strong signals only)
@@ -1288,7 +1288,7 @@ def run_daily_collection(test_mode: bool = False, bootstrap: bool = False):
                 logger.warning(f"  Failed to reactivate {listing_id}: {e}")
         logger.info(f"  ✅ Reactivated {reactivated} listings")
 
-    # Step 5: Process MISSING listings
+    # Step 5: Process MISSING listings (using calendar days, not scrape count)
     ended_count = 0
     if scrape_failed:
         logger.info(f"\n❓ Step 5: SKIPPED - Scrape failure detected, not marking {len(missing_ids)} listings as missing")
@@ -1296,15 +1296,33 @@ def run_daily_collection(test_mode: bool = False, bootstrap: bool = False):
         logger.info(f"\n❓ Step 5: Processing {len(missing_ids)} missing listings")
 
         for listing_id in missing_ids:
-            missing_days = mark_lifecycle_missing(supabase, listing_id)
+            # Get last_seen_at and calculate calendar days
+            result = supabase.table("listing_lifecycle") \
+                .select("last_seen_at") \
+                .eq("listing_id", listing_id) \
+                .execute()
 
-            if missing_days >= MISSING_DAYS_THRESHOLD:
+            if not result.data:
+                continue
+
+            last_seen = result.data[0]["last_seen_at"]
+            if last_seen:
+                last_seen_dt = datetime.fromisoformat(last_seen.replace("Z", "+00:00")).replace(tzinfo=None)
+                days_since_seen = (datetime.now() - last_seen_dt).days
+            else:
+                days_since_seen = 999  # Never seen, treat as very old
+
+            # Increment the counter for tracking (but decision based on calendar days)
+            mark_lifecycle_missing(supabase, listing_id)
+
+            if days_since_seen >= MISSING_DAYS_THRESHOLD:
                 # Mark as ended
                 end_lifecycle(supabase, listing_id, "RENTED_INFERRED")
 
                 # Try to promote to verified
                 if promote_to_verified(supabase, listing_id):
                     ended_count += 1
+                    logger.info(f"    📤 Listing {listing_id} ended after {days_since_seen} days")
 
         logger.info(f"  ✅ Ended {ended_count} listings, promoted to verified")
 
