@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Home, Lock, ArrowRight, BadgeCheck, ShieldCheck } from 'lucide-react'
+import { Home, Lock, ArrowRight, Check } from 'lucide-react'
 
 interface ValidatedListing {
   listing_id: number
@@ -88,19 +88,10 @@ export function SimilarListings({
     return null
   }
 
-  const getTierBadge = (tier: string) => {
-    if (tier === 'PATVIRTINTAS') {
-      return (
-        <span className="absolute top-2 left-2 bg-green-500 text-white text-[10px] font-semibold px-2 py-1 rounded-full flex items-center gap-1">
-          <ShieldCheck className="w-3 h-3" />
-          PATVIRTINTAS
-        </span>
-      )
-    }
+  const getTierBadge = () => {
     return (
-      <span className="absolute top-2 left-2 bg-blue-500 text-white text-[10px] font-semibold px-2 py-1 rounded-full flex items-center gap-1">
-        <BadgeCheck className="w-3 h-3" />
-        GERAS
+      <span className="absolute top-2 left-2 bg-green-500 text-white p-1.5 rounded-full" title="Patikrintas skelbimas">
+        <Check className="w-3 h-3" strokeWidth={3} />
       </span>
     )
   }
@@ -145,7 +136,7 @@ export function SimilarListings({
                 )}
 
                 {/* Tier Badge (only visible ones) */}
-                {!isLocked && getTierBadge(listing.validation_tier)}
+                {!isLocked && getTierBadge()}
 
                 {/* Locked Overlay */}
                 {isLocked && (
