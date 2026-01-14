@@ -8,6 +8,40 @@ This system validates whether "good deals" (listings priced below predicted mark
 
 ---
 
+## Full Pipeline / Pilnas Procesas
+
+### Step 0: Run best_deals.py (REQUIRED FIRST)
+
+Before validation, you must run the deal scoring pipeline to populate/update the `deal_analysis` table:
+
+```bash
+cd backend
+python best_deals.py [limit] [days]
+
+# Examples:
+python best_deals.py 2000 12    # Analyze up to 2000 active listings from last 12 days
+python best_deals.py 500 7      # Analyze up to 500 active listings from last 7 days
+```
+
+**What best_deals.py does:**
+1. Queries `listing_lifecycle` for ACTIVE listings from last N days
+2. Fetches snapshot data from `listing_snapshots` for each listing
+3. Runs the ML price prediction model (same as production website)
+4. Calculates deal_score: `(predicted_price - actual_price) / predicted_price * 100`
+5. Saves results to `deal_analysis` table and `best_deals_results.json`
+
+**Output:**
+- Shows progress: `[1/991] 1447321 (Antakalnis)... €500 vs €442 (+13.1%)`
+- Positive % = underpriced (good deal), Negative % = overpriced
+- Top 5% and 10% deals are printed at the end
+- Results saved with run_id timestamp (e.g., `20260114_105017`)
+
+### Step 1: Validate Top Deals (Manual via Claude Code)
+
+After running best_deals.py, validate the top-scoring deals to filter out fakes/problematic listings. See "Validation Process" section below.
+
+---
+
 ## System Components / Sistemos Komponentai
 
 ### 1. Data Sources / Duomenų Šaltiniai

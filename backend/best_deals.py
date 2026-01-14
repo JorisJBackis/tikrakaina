@@ -127,7 +127,7 @@ def featurize_from_db(row, district_categories, feature_order):
 
 
 def main(limit=2000, days=12):
-    print(f"Loading NEW model (same as production)...")
+    print(f"Loading NEW model (same as production)...", flush=True)
 
     with open('model_new.pkl', 'rb') as f:
         model = pickle.load(f)
@@ -140,7 +140,7 @@ def main(limit=2000, days=12):
     from datetime import timedelta
     cutoff_date = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
 
-    print(f"Fetching ACTIVE listings posted after {cutoff_date} (last {days} days)...")
+    print(f"Fetching ACTIVE listings posted after {cutoff_date} (last {days} days)...", flush=True)
     supabase = get_supabase()
 
     # Fetch listings (with pagination if needed for large limits)
@@ -165,10 +165,13 @@ def main(limit=2000, days=12):
                 break
             offset += page_size
 
-    print(f"Fetched {len(all_lifecycle_rows)} listings")
+    print(f"Fetched {len(all_lifecycle_rows)} listings", flush=True)
 
+    print(f"Loading snapshots...", flush=True)
     listings = []
-    for row in all_lifecycle_rows:
+    for i, row in enumerate(all_lifecycle_rows):
+        if (i + 1) % 100 == 0:
+            print(f"  [{i+1}/{len(all_lifecycle_rows)}] snapshots loaded...", flush=True)
         snap = supabase.from_('listing_snapshots').select(
             'area_m2, rooms, district, street, floor_current, floor_total, year_built, date_posted, raw_features'
         ).eq('listing_id', row['listing_id']).limit(1).execute()
@@ -177,7 +180,7 @@ def main(limit=2000, days=12):
             row.update(snap.data[0])
             listings.append(row)
 
-    print(f"Found {len(listings)} listings\n")
+    print(f"Found {len(listings)} listings with snapshots\n", flush=True)
 
     results = []
     for i, row in enumerate(listings):
@@ -215,11 +218,11 @@ def main(limit=2000, days=12):
                     'dist_to_center_km': round(dist, 3) if dist else None,
                     'first_seen_at': row.get('first_seen_at'),
                 })
-                print(f"€{actual_price} vs €{round(predicted_total)} ({deal_score:+.1f}%)")
+                print(f"€{actual_price} vs €{round(predicted_total)} ({deal_score:+.1f}%)", flush=True)
             else:
-                print("skip")
+                print("skip", flush=True)
         except Exception as e:
-            print(f"error: {e}")
+            print(f"error: {e}", flush=True)
 
     results.sort(key=lambda x: x['deal_score'], reverse=True)
 
