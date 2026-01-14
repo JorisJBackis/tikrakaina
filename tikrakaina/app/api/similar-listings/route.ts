@@ -127,6 +127,7 @@ export async function POST(request: NextRequest) {
           url
         `)
         .in('validation_tier', ['GERAS', 'PATVIRTINTAS'])
+        .eq('listing_status', 'ACTIVE')
         .not('validation_summary', 'is', null)
 
       if (fallbackError) {
