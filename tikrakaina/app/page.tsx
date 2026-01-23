@@ -391,31 +391,31 @@ export default function NotionStyleVersion() {
     {
       id: 'starter',
       name: '1 analizė',
-      price: '€0.99',
+      price: '€2.99',
       period: '',
       credits: '1 analizė',
-      pricePerAnalysis: '€0.99 / analizė',
+      pricePerAnalysis: '€2.99 / analizė',
       features: []
     },
     {
       id: 'pro',
-      name: '7 analizės',
+      name: '5 analizės',
       price: '€4.99',
       period: '',
-      credits: '7 analizės',
-      pricePerAnalysis: '€0.71 / analizė',
-      savings: 'Sutaupote 28%',
+      credits: '5 analizės',
+      pricePerAnalysis: '€1.00 / analizė',
+      savings: 'Sutaupote 67%',
       features: [],
       popular: true
     },
     {
       id: 'enterprise',
-      name: '20 analizių',
+      name: '15 analizių',
       price: '€9.99',
       period: '',
-      credits: '20 analizių',
-      pricePerAnalysis: '€0.50 / analizė',
-      savings: 'Sutaupote 50% ',
+      credits: '15 analizių',
+      pricePerAnalysis: '€0.67 / analizė',
+      savings: 'Sutaupote 78%',
       features: []
     }
   ]

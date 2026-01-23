@@ -14,28 +14,28 @@ const creditPackages = [
   {
     id: 'starter',
     credits: 1,
-    price: 99, // cents
-    priceDisplay: '€0.99',
-    pricePerCredit: 0.99,
+    price: 299, // cents
+    priceDisplay: '€2.99',
+    pricePerCredit: 2.99,
     popular: false
   },
   {
     id: 'pro',
-    credits: 7,
+    credits: 5,
     price: 499, // cents
     priceDisplay: '€4.99',
-    pricePerCredit: 0.71,
+    pricePerCredit: 1.00,
     popular: true,
-    savings: '28%'
+    savings: '67%'
   },
   {
     id: 'enterprise',
-    credits: 20,
+    credits: 15,
     price: 999, // cents
     priceDisplay: '€9.99',
-    pricePerCredit: 0.50,
+    pricePerCredit: 0.67,
     popular: false,
-    savings: '50%'
+    savings: '78%'
   }
 ]
 

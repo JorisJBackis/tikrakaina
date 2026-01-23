@@ -93,7 +93,8 @@ async def create_checkout(request: CheckoutRequest = CheckoutRequest()):
         amount_cents = request.amountCents if request.amountCents else 100
 
         # Calculate credits based on amount
-        credits = 1 if amount_cents == 99 else 7 if amount_cents == 499 else 20 if amount_cents == 999 else 1
+        # Pricing: €2.99 = 1, €4.99 = 5, €9.99 = 15
+        credits = 1 if amount_cents == 299 else 5 if amount_cents == 499 else 15 if amount_cents == 999 else 1
 
         # Create payment attempt record with userId
         attempt = await create_payment_attempt(

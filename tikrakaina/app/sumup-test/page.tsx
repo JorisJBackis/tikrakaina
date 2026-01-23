@@ -23,9 +23,9 @@ interface PaymentTier {
 }
 
 const paymentTiers: PaymentTier[] = [
-  { id: 'starter', credits: 1, price: 99, priceDisplay: '€0.99' },
-  { id: 'value', credits: 7, price: 499, priceDisplay: '€4.99', popular: true },
-  { id: 'pro', credits: 20, price: 999, priceDisplay: '€9.99' }
+  { id: 'starter', credits: 1, price: 299, priceDisplay: '€2.99' },
+  { id: 'value', credits: 5, price: 499, priceDisplay: '€4.99', popular: true },
+  { id: 'pro', credits: 15, price: 999, priceDisplay: '€9.99' }
 ]
 
 export default function SumUpTestPage() {
