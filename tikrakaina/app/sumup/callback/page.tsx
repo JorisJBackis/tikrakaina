@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { CheckCircle, XCircle, Clock, Loader2 } from 'lucide-react'
 
@@ -10,7 +10,7 @@ interface PaymentResult {
   creditsAdded?: number
 }
 
-export default function SumUpCallbackPage() {
+function CallbackContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const [result, setResult] = useState<PaymentResult | null>(null)
@@ -197,5 +197,28 @@ export default function SumUpCallbackPage() {
         )}
       </div>
     </div>
+  )
+}
+
+// Loading fallback for Suspense
+function LoadingFallback() {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center">
+        <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
+          <Loader2 className="h-12 w-12 text-gray-500 animate-spin" />
+        </div>
+        <h1 className="text-2xl font-bold text-gray-900 mb-3">Kraunama...</h1>
+        <p className="text-gray-600">Palaukite...</p>
+      </div>
+    </div>
+  )
+}
+
+export default function SumUpCallbackPage() {
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <CallbackContent />
+    </Suspense>
   )
 }
