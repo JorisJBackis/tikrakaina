@@ -6,7 +6,7 @@ export default function TermsOfService() {
         <p className="text-gray-600 mb-8"><strong>Paskutinį kartą atnaujinta:</strong> 2025 m. spalio 3 d.</p>
 
         <div className="prose max-w-none">
-          <p>Sveiki atvykę į VilRent! Šios Naudojimosi sąlygos (toliau – &ldquo;Sąlygos&rdquo;) reglamentuoja jūsų naudojimąsi interneto svetaine vilrent.lt (toliau – &ldquo;Svetainė&rdquo;) ir joje teikiamomis paslaugomis (toliau – &ldquo;Paslaugos&rdquo;), kurias teikia Joris Jean Bačkis, veikiantis pagal individualios veiklos pažymą Nr. 1457545 (toliau – &ldquo;mes&rdquo;, &ldquo;mūsų&rdquo;).</p>
+          <p>Sveiki atvykę į VilRent! Šios Naudojimosi sąlygos (toliau – &ldquo;Sąlygos&rdquo;) reglamentuoja jūsų naudojimąsi interneto svetaine vilrent.lt (toliau – &ldquo;Svetainė&rdquo;) ir joje teikiamomis paslaugomis (toliau – &ldquo;Paslaugos&rdquo;), kurias teikia &bdquo;Backis Tech Solutions&ldquo; (registruota Nyderlandų prekybos rūmuose, KvK kodas: 98538284), (toliau – &ldquo;mes&rdquo;, &ldquo;mūsų&rdquo;).</p>
 
           <p>Naudodamiesi mūsų Svetaine ir Paslaugomis, jūs sutinkate su šiomis Sąlygomis. Jei nesutinkate su kuria nors šių Sąlygų dalimi, prašome nesinaudoti mūsų Paslaugomis.</p>
 

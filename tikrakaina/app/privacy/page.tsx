@@ -6,7 +6,7 @@ export default function PrivacyPolicy() {
         <p className="text-gray-600 mb-8"><strong>Paskutinį kartą atnaujinta:</strong> 2025 m. spalio 3 d.</p>
 
         <div className="prose max-w-none">
-          <p>Ši Privatumo politika paaiškina, kaip Joris Jean Bačkis, veikiantis pagal individualios veiklos pažymą Nr. 1457545 (toliau – &ldquo;mes&rdquo;, &ldquo;mūsų&rdquo;), renka, naudoja ir saugo jūsų asmeninę informaciją, kai lankotės mūsų interneto svetainėje vilrent.lt (toliau – &ldquo;Svetainė&rdquo;) ir naudojatės joje teikiamomis paslaugomis.</p>
+          <p>Ši Privatumo politika paaiškina, kaip &bdquo;Backis Tech Solutions&ldquo; (juridinio asmens kodas KvK: 98538284, Nyderlandai) (toliau – &ldquo;mes&rdquo;, &ldquo;mūsų&rdquo;), renka, naudoja ir saugo jūsų asmeninę informaciją, kai lankotės mūsų interneto svetainėje vilrent.lt (toliau – &ldquo;Svetainė&rdquo;) ir naudojatės joje teikiamomis paslaugomis.</p>
 
           <p>Mes gerbiame jūsų privatumą ir esame įsipareigoję saugoti jūsų asmens duomenis, vadovaudamiesi Bendruoju duomenų apsaugos reglamentu (BDAR) ir kitais taikytinais teisės aktais.</p>
 
@@ -60,8 +60,9 @@ export default function PrivacyPolicy() {
 
           <h3 className="text-xl font-semibold text-gray-900 mt-8 mb-4">8. Kontaktinė informacija</h3>
           <p>Jei turite klausimų dėl šios Privatumo politikos, susisiekite su mumis:</p>
-          <p><strong>Duomenų valdytojas:</strong> Joris Jean Bačkis</p>
-          <p><strong>Individualios veiklos pažymos Nr.:</strong> 1457545</p>
+          <p><strong>Duomenų valdytojas:</strong> &bdquo;Backis Tech Solutions&ldquo;</p>
+          <p><strong>Registracijos kodas (KvK):</strong> 98538284</p>
+          <p><strong>Adresas:</strong> Veenkampenweg 16 J, 7822GS Emmen, Nyderlandai</p>
           <p><strong>El. paštas:</strong> support@vilrent.lt</p>
         </div>
       </div>

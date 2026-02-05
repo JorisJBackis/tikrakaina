@@ -126,6 +126,16 @@ async def add_credits_to_user(user_id: str, credits_to_add: int):
         print(f"Error adding credits to user {user_id}: {e}")
         return False
 
+async def add_credits_for_payment_atomic(ref: str) -> int:
+    """Atomically add credits for a payment using database-level locking.
+    Returns credits added (0 if already processed), or -1 on error."""
+    try:
+        result = supabase.rpc('add_credits_for_payment', {'payment_ref': ref}).execute()
+        return result.data if isinstance(result.data, int) else 0
+    except Exception as e:
+        print(f"Error in atomic credit addition for payment {ref}: {e}")
+        return -1
+
 async def get_payment_attempt(ref: str):
     """Get a payment attempt by reference."""
     result = supabase.table("payment_attempts").select("*").eq("ref", ref).execute()

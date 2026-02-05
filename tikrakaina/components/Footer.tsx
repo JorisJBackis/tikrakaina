@@ -12,7 +12,7 @@ export default function Footer() {
               DI valdoma NT nuomos kainų analizė Vilniuje
             </p>
             <p className="text-sm mt-2">
-              IĮ pažymos Nr. 1457545
+              KvK: 98538284, Nyderlandai
             </p>
           </div>
 

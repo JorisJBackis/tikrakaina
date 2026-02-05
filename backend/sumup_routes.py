@@ -19,6 +19,7 @@ from database import (
     update_payment_attempt,
     list_payment_attempts,
     add_credits_to_user,
+    add_credits_for_payment_atomic,
     PaymentStatus,
     supabase
 )
@@ -276,22 +277,27 @@ async def verify_payment_manually(
                         "sumup_raw": checkout,
                     })
 
-                    # If payment successful, add credits to user account (only once)
+                    # If payment successful, add credits atomically (prevents double-crediting)
                     credits_added = 0
                     if new_status == PaymentStatus.PAID.value and attempt.get("user_id"):
-                        # Check if credits were already added (idempotency)
-                        if not attempt.get("credits_added"):
-                            credits_to_add = attempt.get("credits_purchased", 1)
-                            success = await add_credits_to_user(attempt["user_id"], credits_to_add)
-                            if success:
-                                credits_added = credits_to_add
-                                # Mark credits as added in database
-                                await update_payment_attempt(ref, {"credits_added": True})
-                                logger.info(f"[Manual Verify] Added {credits_to_add} credits to user {attempt['user_id']}")
-                            else:
-                                logger.error(f"[Manual Verify] Failed to add credits to user {attempt['user_id']}")
-                        else:
+                        result = await add_credits_for_payment_atomic(ref)
+                        if result > 0:
+                            credits_added = result
+                            logger.info(f"[Manual Verify] Atomically added {result} credits to user {attempt['user_id']}")
+                        elif result == 0:
                             logger.info(f"[Manual Verify] Credits already added for payment {ref}, skipping")
+                        else:
+                            # Atomic function failed, fall back to old method
+                            logger.warning(f"[Manual Verify] Atomic credit add failed for {ref}, falling back")
+                            if not attempt.get("credits_added"):
+                                credits_to_add = attempt.get("credits_purchased", 1)
+                                success = await add_credits_to_user(attempt["user_id"], credits_to_add)
+                                if success:
+                                    credits_added = credits_to_add
+                                    await update_payment_attempt(ref, {"credits_added": True})
+                                    logger.info(f"[Manual Verify] Fallback: added {credits_to_add} credits to user {attempt['user_id']}")
+                                else:
+                                    logger.error(f"[Manual Verify] Fallback also failed for user {attempt['user_id']}")
 
                     return JSONResponse({
                         "ref": ref,
@@ -521,22 +527,27 @@ async def sumup_webhook(request: Request):
 
             logger.info(f"Payment {ref} verified and updated to {new_status}")
 
-            # If payment successful, add credits to user account (only once)
+            # If payment successful, add credits atomically (prevents double-crediting)
             credits_added = 0
             if new_status == PaymentStatus.PAID.value and attempt.get("user_id"):
-                # Check if credits were already added (idempotency)
-                if not attempt.get("credits_added"):
-                    credits_to_add = attempt.get("credits_purchased", 1)
-                    success = await add_credits_to_user(attempt["user_id"], credits_to_add)
-                    if success:
-                        credits_added = credits_to_add
-                        # Mark credits as added in database
-                        await update_payment_attempt(ref, {"credits_added": True})
-                        logger.info(f"[Webhook] Added {credits_to_add} credits to user {attempt['user_id']}")
-                    else:
-                        logger.error(f"[Webhook] Failed to add credits to user {attempt['user_id']}")
-                else:
+                result = await add_credits_for_payment_atomic(ref)
+                if result > 0:
+                    credits_added = result
+                    logger.info(f"[Webhook] Atomically added {result} credits to user {attempt['user_id']}")
+                elif result == 0:
                     logger.info(f"[Webhook] Credits already added for payment {ref}, skipping")
+                else:
+                    # Atomic function failed, fall back to old method
+                    logger.warning(f"[Webhook] Atomic credit add failed for {ref}, falling back")
+                    if not attempt.get("credits_added"):
+                        credits_to_add = attempt.get("credits_purchased", 1)
+                        success = await add_credits_to_user(attempt["user_id"], credits_to_add)
+                        if success:
+                            credits_added = credits_to_add
+                            await update_payment_attempt(ref, {"credits_added": True})
+                            logger.info(f"[Webhook] Fallback: added {credits_to_add} credits to user {attempt['user_id']}")
+                        else:
+                            logger.error(f"[Webhook] Fallback also failed for user {attempt['user_id']}")
 
             return JSONResponse({"status": "ok", "verified_status": new_status, "creditsAdded": credits_added})
 
