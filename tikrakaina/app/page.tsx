@@ -403,7 +403,7 @@ export default function NotionStyleVersion() {
       price: '€4.99',
       period: '',
       credits: '5 analizės',
-      pricePerAnalysis: '€1.00 / analizė',
+      pricePerAnalysis: '€0.99 / analizė',
       savings: 'Sutaupote 67%',
       features: [],
       popular: true

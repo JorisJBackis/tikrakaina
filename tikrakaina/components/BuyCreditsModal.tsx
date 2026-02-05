@@ -24,7 +24,7 @@ const creditPackages = [
     credits: 5,
     price: 499, // cents
     priceDisplay: '€4.99',
-    pricePerCredit: 1.00,
+    pricePerCredit: 0.99,
     popular: true,
     savings: '67%'
   },
