@@ -1,0 +1,23 @@
+# Ruff configuration for VilRent backend
+# https://docs.astral.sh/ruff/
+
+[lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # Pyflakes
+    "I",    # isort
+    "B",    # flake8-bugbear
+    "S",    # flake8-bandit (security)
+]
+ignore = [
+    "E501",  # line too long (handled by formatter)
+    "S101",  # assert usage (fine in tests)
+]
+
+[lint.per-file-ignores]
+"tests/**/*.py" = ["S101"]  # Allow asserts in tests
+
+[format]
+quote-style = "double"
+indent-style = "space"
