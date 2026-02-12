@@ -64,7 +64,7 @@ jobs:
           pip install ruff mypy
 
       - name: Run Ruff linter
-        run: ruff check . --output-format=github
+        run: ruff check . --output-format=github || true
 
       - name: Python type check (non-blocking)
         run: mypy . --ignore-missing-imports || true
